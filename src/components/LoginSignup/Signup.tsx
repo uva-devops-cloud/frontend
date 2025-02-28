@@ -11,6 +11,7 @@ import ApiInteractions from '../API/ApiInteractions';
 
 
 
+
 const Signup: React.FC = () => {
     //Necessary hooks to work with variables
     const [email, setEmail] = useState('');
@@ -93,6 +94,7 @@ const Signup: React.FC = () => {
                             <div className="submit-container">
                                 <div className="submit" onClick={() => { navigate('/ApiInteractions') }}>API demo</div>
                             </div>
+
                         </>
                     ) : (
                         <>
