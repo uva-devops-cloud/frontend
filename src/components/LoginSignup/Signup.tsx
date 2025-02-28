@@ -5,7 +5,8 @@ import './LoginSignup.css'
 import email_icon from '../assets/email.png'
 import password_icon from '../assets/password.png'
 import user_icon from '../assets/user_icon.png'
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom'
+import ApiInteractions from '../API/ApiInteractions';
 
 
 
@@ -88,6 +89,9 @@ const Signup: React.FC = () => {
                             </div>
                             <div className="submit-container">
                                 <div className="submit" onClick={() => { signUp(); setStep(2); setTitle('Confirm Sign Up') }}>Sign Up</div>
+                            </div>
+                            <div className="submit-container">
+                                <div className="submit" onClick={() => { navigate('/ApiInteractions') }}>API demo</div>
                             </div>
                         </>
                     ) : (
