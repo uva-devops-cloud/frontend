@@ -4,12 +4,12 @@ import UserPool from '../resources/Cognito';
 import './LoginSignup.css'
 import email_icon from '../assets/email.png'
 import password_icon from '../assets/password.png'
-import { useNavigate } from 'react-router-dom';
 
 
 const Login: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [token, setToken] = useState<string | null>(null);
 
     const signIn = (email: string, password: string) => {
         const user = new CognitoUser({
@@ -26,6 +26,8 @@ const Login: React.FC = () => {
             onSuccess: (result) => {
                 console.log('Login successful!', result);
                 alert('Login successful!');
+                const accessToken = result.getAccessToken().getJwtToken(); // get the token from cognito
+                setToken(accessToken);
             },
             onFailure: (err) => {
                 console.error('Login failed:', err);
