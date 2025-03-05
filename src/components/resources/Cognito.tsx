@@ -1,3 +1,4 @@
+
 (window as any).global = window;
 import { CognitoUserPool } from 'amazon-cognito-identity-js';
 const poolData = {
