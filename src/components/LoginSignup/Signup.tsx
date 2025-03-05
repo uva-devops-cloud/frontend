@@ -11,13 +11,16 @@ import { useNavigate } from 'react-router-dom'
 
 
 
+
 const Signup: React.FC = () => {
     //Necessary hooks to work with variables
     const [email, setEmail] = useState('');
     const [firstName, setfirstName] = useState('');
     const [lastName, setlastName] = useState('');
     const [password, setPassword] = useState('');
+
     const [name, setName] = useState('');
+
     const [code, setCode] = useState(''); //confirmation code
     const [step, setStep] = useState(1);
     const [title, setTitle] = useState('Sign Up')
@@ -32,6 +35,7 @@ const Signup: React.FC = () => {
             new CognitoUserAttribute({ Name: 'name', Value: name }),
             // new CognitoUserAttribute({ Name: 'First Name', Value: firstName }),
             //new CognitoUserAttribute({ Name: 'Last Name', Value: lastName })
+
         ];
         //signUp function from cognito
         UserPool.signUp(email, password, attributeList, [], (err, result) => {
@@ -77,6 +81,7 @@ const Signup: React.FC = () => {
                             <div className="input">
                                 <img src={user_icon} alt="" />
                                 <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
+
                             </div>
                             <div className="input">
                                 <img src={email_icon} alt="" />
@@ -92,12 +97,14 @@ const Signup: React.FC = () => {
                             <div className="submit-container">
                                 <div className="submit" onClick={() => { navigate('/ApiInteractions') }}>API demo</div>
                             </div>
+
                         </>
                     ) : (
                         <>
                             <div className="input">
                                 <img src={password_icon} alt="" />
                                 <input type="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Verification code" />
+
                             </div>
                             <div className="submit-container">
                                 <div className="submit" onClick={() => { confirmSignUp(); setStep(1); setTitle('Sign Up') }}>Sign Up</div>
