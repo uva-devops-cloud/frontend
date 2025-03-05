@@ -10,7 +10,6 @@ import password_icon from '../assets/password.png'
 const Login: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-
     const [token, setToken] = useState<string | null>(null);
 
 
