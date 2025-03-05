@@ -8,9 +8,6 @@ import ApiInteractions from "./components/API/ApiInteractions";
 
 
 
-
-
-
 function App() {
   return (
     <Router>

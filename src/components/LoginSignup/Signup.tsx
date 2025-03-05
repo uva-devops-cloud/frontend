@@ -6,7 +6,7 @@ import email_icon from '../assets/email.png'
 import password_icon from '../assets/password.png'
 import user_icon from '../assets/user_icon.png'
 import { useNavigate } from 'react-router-dom'
-import ApiInteractions from '../API/ApiInteractions';
+
 
 
 
@@ -18,18 +18,24 @@ const Signup: React.FC = () => {
     const [firstName, setfirstName] = useState('');
     const [lastName, setlastName] = useState('');
     const [password, setPassword] = useState('');
+
+    const [name, setName] = useState('');
+
     const [code, setCode] = useState(''); //confirmation code
     const [step, setStep] = useState(1);
     const [title, setTitle] = useState('Sign Up')
     const navigate = useNavigate();// for file navigation in browser
+
 
     //Whole process of Signing Up
     const signUp = () => {
         //List of attributes required for cognito
         const attributeList = [
             new CognitoUserAttribute({ Name: 'email', Value: email }),
-            new CognitoUserAttribute({ Name: 'First Name', Value: firstName }),
-            new CognitoUserAttribute({ Name: 'Last Name', Value: lastName })
+            new CognitoUserAttribute({ Name: 'name', Value: name }),
+            // new CognitoUserAttribute({ Name: 'First Name', Value: firstName }),
+            //new CognitoUserAttribute({ Name: 'Last Name', Value: lastName })
+
         ];
         //signUp function from cognito
         UserPool.signUp(email, password, attributeList, [], (err, result) => {
@@ -74,11 +80,8 @@ const Signup: React.FC = () => {
                         <>
                             <div className="input">
                                 <img src={user_icon} alt="" />
-                                <input type="text" value={firstName} onChange={(e) => setfirstName(e.target.value)} placeholder="First Name" />
-                            </div>
-                            <div className="input">
-                                <img src={user_icon} alt="" />
-                                <input type="text" value={lastName} onChange={(e) => setlastName(e.target.value)} placeholder="Last Name" />
+                                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
+
                             </div>
                             <div className="input">
                                 <img src={email_icon} alt="" />
@@ -100,7 +103,8 @@ const Signup: React.FC = () => {
                         <>
                             <div className="input">
                                 <img src={password_icon} alt="" />
-                                <input type="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Name" />
+                                <input type="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Verification code" />
+
                             </div>
                             <div className="submit-container">
                                 <div className="submit" onClick={() => { confirmSignUp(); setStep(1); setTitle('Sign Up') }}>Sign Up</div>
