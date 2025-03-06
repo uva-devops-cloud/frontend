@@ -1,4 +1,4 @@
-name: Terraform Deployment (Reusable)
+name:  Deployment (Reusable)
 
 on:
   workflow_call:
@@ -48,4 +48,10 @@ jobs:
         run: aws s3 sync ./dist s3://studentportal-frontend-bucket-474668415523 --delete
 
       - name: Invalidate CloudFront cache
-        run: aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
+        env:
+          DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "$DISTRIBUTION_ID" \
+            --paths "/*"
+      
