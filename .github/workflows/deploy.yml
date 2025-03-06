@@ -19,7 +19,7 @@ jobs:
       environment: dev
       aws_account_id: "474668415523"
     secrets:
-      CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+      CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID_DEV }}
 
   deploy-prod:
     name: Deploy to Prod
@@ -30,4 +30,4 @@ jobs:
       environment: prod
       aws_account_id: "054037129431"
     secrets:
-      CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+      CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID_PROD }}
