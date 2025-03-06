@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { fetchCourses, fetchProgram, fetchStudent, postToken, Student, Program, Course } from '../API/Api';
+import { fetchCourses, fetchStudent, Student, Course } from '../API/Api';
 
 
 const SomeComponent = () => {
     const [student, setStudent] = useState<Student[]>([]);
     const [courses, setCourses] = useState<Course[]>([]);
-    const [token] = useState<string | null>(null);
-
+    //const [token] = useState<string | null>(null);
+    console.log(student, courses);
     useEffect(() => {
         const getStudent = async () => {
             try {
@@ -30,7 +30,7 @@ const SomeComponent = () => {
         getCourses();
     }, []);
 
-    const handlePostToken = async () => {
+    /*const handlePostToken = async () => {
         if (token) {
             try {
                 await postToken(token);
@@ -38,7 +38,7 @@ const SomeComponent = () => {
                 console.error('Error posting token:', error);
             }
         }
-    };
+    };*/
 
     return (
         <nav className="navbar navbar-expand-lg navbar-light bg-light">

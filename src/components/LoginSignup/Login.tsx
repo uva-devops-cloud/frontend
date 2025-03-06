@@ -12,7 +12,7 @@ const Login: React.FC = () => {
     const [password, setPassword] = useState('');
     const [token, setToken] = useState<string | null>(null);
     const navigate = useNavigate(); // For file navigation in browser
-
+    console.log(token);
 
     const signIn = (email: string, password: string) => {
         const user = new CognitoUser({
