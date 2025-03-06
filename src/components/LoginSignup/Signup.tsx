@@ -1,53 +1,48 @@
-import React, { useState } from 'react'
+import React, { useState } from 'react';
 import { CognitoUser, CognitoUserAttribute } from 'amazon-cognito-identity-js';
 import UserPool from '../resources/Cognito';
-import './LoginSignup.css'
-import email_icon from '../assets/email.png'
-import password_icon from '../assets/password.png'
-import user_icon from '../assets/user_icon.png'
-import { useNavigate } from 'react-router-dom'
-
-
-
-
+import './LoginSignup.css';
+import email_icon from '../assets/email.png';
+import password_icon from '../assets/password.png';
+import user_icon from '../assets/user_icon.png';
+import { useNavigate } from 'react-router-dom';
 
 const Signup: React.FC = () => {
-    //Necessary hooks to work with variables
+    // Necessary hooks to work with variables
     const [email, setEmail] = useState('');
-    const [firstName, setfirstName] = useState('');
-    const [lastName, setlastName] = useState('');
+    //const [firstName, setFirstName] = useState('');
+    //const [lastName, setLastName] = useState('');
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
-    const [code, setCode] = useState(''); //confirmation code
+    const [code, setCode] = useState(''); // Confirmation code
     const [step, setStep] = useState(1);
-    const [title, setTitle] = useState('Sign Up')
-    const navigate = useNavigate();// for file navigation in browser
+    const [title, setTitle] = useState('Sign Up');
+    const navigate = useNavigate(); // For file navigation in browser
 
-
-    //Whole process of Signing Up
+    // Whole process of Signing Up
     const signUp = () => {
-        //List of attributes required for cognito
+        // List of attributes required for cognito
         const attributeList = [
             new CognitoUserAttribute({ Name: 'email', Value: email }),
             new CognitoUserAttribute({ Name: 'name', Value: name }),
-            // new CognitoUserAttribute({ Name: 'First Name', Value: firstName }),
-            //new CognitoUserAttribute({ Name: 'Last Name', Value: lastName })
+            new CognitoUserAttribute({ Name: 'username', Value: email })
         ];
-        //signUp function from cognito
+        // signUp function from cognito
         UserPool.signUp(email, password, attributeList, [], (err, result) => {
             if (err) {
                 console.error(err);
-                alert(err.message)
+                alert(err.message);
             } else {
                 console.log("Sign Up successful:", result);
-
+                setStep(2);
+                setTitle('Confirm Sign Up');
             }
         });
-        setfirstName(''); setPassword(''); setEmail(''); setlastName('');
-    }
+
+    };
 
     const confirmSignUp = () => {
-        //creation of a user
+        // Creation of a user
         const user = new CognitoUser({ Username: email, Pool: UserPool });
 
         user.confirmRegistration(code, true, (err, result) => {
@@ -57,13 +52,14 @@ const Signup: React.FC = () => {
             } else {
                 console.log('User confirmed:', result);
                 alert('Registration successful! You can now log in.');
+                navigate('/login');
             }
-        })
-        setCode('');
-        navigate('/login');
-    }
+        });
+        setCode(''); setPassword(''); setEmail('');
+        //setLastName(''); setFirstName('');
+    };
 
-    //rendering depending on which state we are at. Step 1 is Sign up, step 2 is confirmation code
+    // Rendering depending on which state we are at. Step 1 is Sign up, step 2 is confirmation code
     return (
         <div className='wrapper'>
             <div className="container">
@@ -87,6 +83,7 @@ const Signup: React.FC = () => {
                                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" />
                             </div>
                             <div className="submit-container">
+                                <div className="submit gray" onClick={() => navigate('/Login')}>Sign In</div>
                                 <div className="submit" onClick={() => { signUp(); setStep(2); setTitle('Confirm Sign Up') }}>Sign Up</div>
                             </div>
                             <div className="submit-container">
@@ -97,17 +94,18 @@ const Signup: React.FC = () => {
                         <>
                             <div className="input">
                                 <img src={password_icon} alt="" />
-                                <input type="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Verification code" />
+                                <input type="text" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Verification code" />
                             </div>
                             <div className="submit-container">
-                                <div className="submit" onClick={() => { confirmSignUp(); setStep(1); setTitle('Sign Up') }}>Sign Up</div>
+                                <div className="submit" onClick={() => { confirmSignUp(); setStep(1); setTitle('Sign Up') }}>Confirm Sign Up</div>
+                                <div className="submit gray" onClick={() => navigate('/Login')}>Back to Login</div>
                             </div>
-                        </>)}
+                        </>
+                    )}
                 </div>
-
             </div>
         </div>
-    )
-}
+    );
+};
 
-export default Signup
+export default Signup;

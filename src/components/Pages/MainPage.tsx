@@ -1,32 +1,33 @@
 import { useEffect, useState } from 'react';
-import { fetchUsers, fetchGrades, postToken, User, Grade } from '../API/Api'; // Adjust the import path as needed
+import { fetchCourses, fetchProgram, fetchStudent, postToken, Student, Program, Course } from '../API/Api';
+
 
 const SomeComponent = () => {
-    const [users, setUsers] = useState<User[]>([]);
-    const [grades, setGrades] = useState<Grade[]>([]);
+    const [student, setStudent] = useState<Student[]>([]);
+    const [courses, setCourses] = useState<Course[]>([]);
     const [token] = useState<string | null>(null);
 
     useEffect(() => {
-        const getUsers = async () => {
+        const getStudent = async () => {
             try {
-                const usersData = await fetchUsers();
-                setUsers(usersData);
+                const studentData = await fetchStudent();
+                setStudent(studentData);
             } catch (error) {
-                console.error('Error fetching users:', error);
+                console.error('Error fetching student data:', error);
             }
         };
 
-        const getGrades = async () => {
+        const getCourses = async () => {
             try {
-                const gradesData = await fetchGrades();
-                setGrades(gradesData);
+                const coursesData = await fetchCourses();
+                setCourses(coursesData);
             } catch (error) {
                 console.error('Error fetching grades:', error);
             }
         };
 
-        getUsers();
-        getGrades();
+        getStudent();
+        getCourses();
     }, []);
 
     const handlePostToken = async () => {
@@ -40,24 +41,47 @@ const SomeComponent = () => {
     };
 
     return (
-        <div>
-            <h1>Users</h1>
-            <ul>
-                {users.map(user => (
-                    <li key={user.id}>{user.name} - {user.email}</li>
-                ))}
-            </ul>
+        <nav className="navbar navbar-expand-lg navbar-light bg-light">
+            <div className="container-fluid">
+                <a className="navbar-brand" href="#">Studee</a>
+                <button className="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+                    <span className="navbar-toggler-icon"></span>
+                </button>
+                <div className="collapse navbar-collapse" id="navbarSupportedContent">
+                    <ul className="navbar-nav me-auto mb-2 mb-lg-0">
+                        <li className="nav-item">
+                            <a className="nav-link active" aria-current="page" href="#">AI Assistant</a>
+                        </li>
+                        <li className="nav-item">
+                            <a className="nav-link" href="#">Parameters</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
 
-            <h1>Grades</h1>
-            <ul>
-                {grades.map(grade => (
-                    <li key={grade.id}>{grade.studentName} - {grade.grade}</li>
-                ))}
-            </ul>
-
-            <button onClick={handlePostToken}>Post Token</button>
-        </div>
     );
 };
 
 export default SomeComponent;
+
+/*<div className="wrapper">
+
+
+<h1>Student Data</h1>
+<ul>
+    {student.map(user => (
+        <li key={user.id}>{user.name} - {user.email}</li>
+    ))}
+</ul>
+
+<h1>Courses</h1>
+<ul>
+    {courses.map(course => (
+        <li key={course.id}>{course.course_name} - {course.course_code}</li>
+    ))}
+</ul>
+
+<button onClick={handlePostToken}>Post Token</button>
+
+</div>*/
