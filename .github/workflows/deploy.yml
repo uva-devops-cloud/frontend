@@ -20,6 +20,8 @@ jobs:
       aws_account_id: "474668415523"
     secrets:
       CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID_DEV }}
+      COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID_DEV }}
+      COGNITO_CLIENT_ID: ${{ secrets.COGNITO_CLIENT_ID_DEV }}
 
   deploy-prod:
     name: Deploy to Prod
@@ -31,3 +33,5 @@ jobs:
       aws_account_id: "054037129431"
     secrets:
       CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID_PROD }}
+      COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID_PROD }}
+      COGNITO_CLIENT_ID: ${{ secrets.COGNITO_CLIENT_ID_PROD }}
