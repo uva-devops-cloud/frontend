@@ -1,4 +1,4 @@
-name:  Deployment (Reusable)
+name: Deployment (Reusable)
 
 on:
   workflow_call:
@@ -9,6 +9,9 @@ on:
       aws_account_id:
         required: true
         type: string
+    secrets:
+      CLOUDFRONT_DISTRIBUTION_ID:
+        required: true
 
 permissions:
   id-token: write
@@ -36,7 +39,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Install dependencies
         run: npm install
