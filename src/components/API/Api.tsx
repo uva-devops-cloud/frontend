@@ -1,5 +1,5 @@
 import { getAuthHeaders } from '../../components/resources/AuthUtility';
-const endpoint = 'https://yj2nmxb5j7.execute-api.eu-west-2.amazonaws.com'; //API
+const endpoint = 'https://yj2nmxb5j7.execute-api.eu-west-2.amazonaws.com/Test'; //API
 
 export interface Student {
     id: number;
