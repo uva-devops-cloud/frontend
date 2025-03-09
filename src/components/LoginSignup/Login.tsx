@@ -5,14 +5,12 @@ import './LoginSignup.css'
 import email_icon from '../assets/email.png'
 import password_icon from '../assets/password.png'
 import { useNavigate } from 'react-router-dom';
-
+import { setAuthToken } from '../../components/resources/AuthUtility'; // Import the new utility
 
 const Login: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [token, setToken] = useState<string | null>(null);
-    const navigate = useNavigate(); // For file navigation in browser
-    console.log(token);
+    const navigate = useNavigate();
 
     const signIn = (email: string, password: string) => {
         const user = new CognitoUser({
@@ -28,10 +26,11 @@ const Login: React.FC = () => {
         user.authenticateUser(authDetails, {
             onSuccess: (result) => {
                 console.log('Login successful!', result);
-                alert('Login successful!');
-                const accessToken = result.getAccessToken().getJwtToken(); // get the token from cognito
-                setToken(accessToken);
-                navigate('/MainPage');
+                //alert('Login successful!');
+                const accessToken = result.getAccessToken().getJwtToken();
+                // Store token using utility
+                setAuthToken(accessToken);
+                navigate('/dashboard');
             },
             onFailure: (err) => {
                 console.error('Login failed:', err);
@@ -60,7 +59,6 @@ const Login: React.FC = () => {
                     <div className="submit-container">
                         <div className="submit" onClick={() => { signIn(email, password) }}>Sign In</div>
                         <div className="submit gray" onClick={() => navigate('/SignUp')}>Sign Up</div>
-                        <div className="submit gray" onClick={() => navigate('/MainPage')}>Homepage</div>
                     </div>
                 </div>
             </div>
