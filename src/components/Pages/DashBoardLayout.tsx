@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { removeAuthToken } from '../../components/resources/AuthUtility';
 import UserPool from '../resources/Cognito';
 import { Outlet } from 'react-router-dom';
-import '../assets/Dahsboard.css'
+import '../assets/Main.css'
 
 const DashboardLayout = () => {
     const navigate = useNavigate();

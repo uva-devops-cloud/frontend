@@ -1,11 +1,11 @@
 import React, { useState } from 'react'
 import { CognitoUser, AuthenticationDetails } from 'amazon-cognito-identity-js';
 import UserPool from '../resources/Cognito';
-import './LoginSignup.css'
+import '../assets/Main.css'
 import email_icon from '../assets/email.png'
 import password_icon from '../assets/password.png'
 import { useNavigate } from 'react-router-dom';
-import { setAuthToken } from '../../components/resources/AuthUtility'; // Import the new utility
+import { setAuthToken } from '../../components/resources/AuthUtility'; 
 
 const Login: React.FC = () => {
     const [email, setEmail] = useState('');

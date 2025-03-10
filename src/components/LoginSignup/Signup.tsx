@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { CognitoUser, CognitoUserAttribute } from 'amazon-cognito-identity-js';
 import UserPool from '../resources/Cognito';
-import './LoginSignup.css';
+import '../assets/Main.css';
 import email_icon from '../assets/email.png';
 import password_icon from '../assets/password.png';
 import user_icon from '../assets/user_icon.png';
@@ -27,6 +27,7 @@ const Signup: React.FC = () => {
             new CognitoUserAttribute({ Name: 'name', Value: name }),
             new CognitoUserAttribute({ Name: 'username', Value: email })
         ];
+        
         // signUp function from cognito
         UserPool.signUp(email, password, attributeList, [], (err, result) => {
             if (err) {
@@ -34,11 +35,10 @@ const Signup: React.FC = () => {
                 alert(err.message);
             } else {
                 console.log("Sign Up successful:", result);
-                setStep(2);
+                setStep(2);  // Only change steps if signup was successful
                 setTitle('Confirm Sign Up');
             }
         });
-
     };
 
     const confirmSignUp = () => {
@@ -52,11 +52,13 @@ const Signup: React.FC = () => {
             } else {
                 console.log('User confirmed:', result);
                 alert('Registration successful! You can now log in.');
+                setCode(''); 
+                setPassword(''); 
+                setEmail('');
+                // Redirect to login on success
                 navigate('/login');
             }
         });
-        setCode(''); setPassword(''); setEmail('');
-        //setLastName(''); setFirstName('');
     };
 
     // Rendering depending on which state we are at. Step 1 is Sign up, step 2 is confirmation code
@@ -82,12 +84,24 @@ const Signup: React.FC = () => {
                                 <img src={password_icon} alt="" />
                                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" />
                             </div>
-                            <div className="submit-container">
-                                <div className="submit gray" onClick={() => navigate('/Login')}>Sign In</div>
-                                <div className="submit" onClick={() => { signUp(); setStep(2); setTitle('Confirm Sign Up') }}>Sign Up</div>
+                            {/* Password requirements info */}
+                            <div className="password-requirements">
+                                <small>
+                                    Password must contain:
+                                    <ul>
+                                        <li>Minimum 8 characters</li>
+                                        <li>At least one number</li>
+                                        <li>At least one uppercase letter</li>
+                                        <li>At least one lowercase letter</li>
+                                    </ul>
+                                </small>
                             </div>
                             <div className="submit-container">
-                                <div className="submit" onClick={() => { navigate('/ApiInteractions') }}>API demo</div>
+                                <div className="submit gray" onClick={() => navigate('/Login')}>Sign In</div>
+                                <div className="submit" onClick={() => signUp()}>Sign Up</div>
+                            </div>
+                            <div className="forgot-password">
+                                Already have a code? <span onClick={() => setStep(2)}>Enter confirmation code</span>
                             </div>
                         </>
                     ) : (
@@ -97,7 +111,7 @@ const Signup: React.FC = () => {
                                 <input type="text" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Verification code" />
                             </div>
                             <div className="submit-container">
-                                <div className="submit" onClick={() => { confirmSignUp(); setStep(1); setTitle('Sign Up') }}>Confirm Sign Up</div>
+                                <div className="submit" onClick={() => confirmSignUp()}>Confirm Sign Up</div>
                                 <div className="submit gray" onClick={() => navigate('/Login')}>Back to Login</div>
                             </div>
                         </>
