@@ -1,6 +1,5 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { fetchCourses, fetchStudent, fetchProgram, Student, Course, Program } from '../API/Api';
-import DataSeeder from '../Sandbox/DataSeeder';
 
 const MainPage = () => {
     const [student, setStudent] = useState<Student[]>([]);
@@ -8,28 +7,27 @@ const MainPage = () => {
     const [programs, setPrograms] = useState<Program[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Memoized loadData function that can be called after seeding
-    const loadData = useCallback(async () => {
-        setIsLoading(true);
-        try {
-            const [studentData, coursesData, programData] = await Promise.all([
-                fetchStudent(),
-                fetchCourses(),
-                fetchProgram()
-            ]);
-            setStudent(studentData);
-            setCourses(coursesData);
-            setPrograms(programData);
-        } catch (error) {
-            console.error('Error fetching data:', error);
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
-
     useEffect(() => {
+        const loadData = async () => {
+            setIsLoading(true);
+            try {
+                const [studentData, coursesData, programData] = await Promise.all([
+                    fetchStudent(),
+                    fetchCourses(),
+                    fetchProgram()
+                ]);
+                setStudent(studentData);
+                setCourses(coursesData);
+                setPrograms(programData);
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
         loadData();
-    }, [loadData]);
+    }, []);
 
     if (isLoading) {
         return <div>Loading...</div>;
@@ -37,9 +35,6 @@ const MainPage = () => {
 
     return (
         <div>
-            {/* Data Seeder Button */}
-            <DataSeeder onDataSeeded={loadData} />
-
             <div className="row">
                 <div className="col-md-6">
                     <div className="card mb-4">
