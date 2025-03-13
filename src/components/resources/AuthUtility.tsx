@@ -16,9 +16,17 @@ export const removeAuthToken = (): void => {
     localStorage.removeItem('authToken');
 };
 
+// Define a type that represents both session types
+interface SessionLike {
+    isValid(): boolean;
+    getIdToken(): { getJwtToken(): string };
+    getAccessToken(): { getJwtToken(): string };
+}
+
 // Get current authenticated user session
-export const getCurrentSession = (): Promise<CognitoUserSession> => {
+export const getCurrentSession = async (): Promise<SessionLike> => {
     return new Promise((resolve, reject) => {
+        // First, try the standard Cognito session check
         const user = UserPool.getCurrentUser();
         if (user) {
             user.getSession((err: Error | null, session: CognitoUserSession | null) => {
@@ -26,13 +34,23 @@ export const getCurrentSession = (): Promise<CognitoUserSession> => {
                     reject(err);
                     return;
                 }
-                if (session) {
-                    resolve(session);
-                } else {
-                    reject(new Error('No valid session'));
-                }
+                resolve(session as SessionLike);
             });
-        } else {
+        }
+        // If no Cognito session but we have tokens from Google SSO
+        else if (localStorage.getItem('accessToken') && localStorage.getItem('idToken')) {
+            resolve({
+                isValid: () => true,
+                getIdToken: () => ({
+                    getJwtToken: () => localStorage.getItem('idToken') || ''
+                }),
+                getAccessToken: () => ({
+                    getJwtToken: () => localStorage.getItem('accessToken') || ''
+                })
+            });
+        }
+        // No valid session found
+        else {
             reject(new Error('No user found'));
         }
     });
@@ -61,5 +79,33 @@ export const getAuthHeaders = async (): Promise<HeadersInit> => {
     } catch (error) {
         console.error('Not authenticated', error);
         throw new Error('Authentication required');
+    }
+};
+
+// Complete logout function that cleans up all auth tokens
+export const logOut = (): void => {
+    // Sign out from Cognito if there's a user session
+    const user = UserPool.getCurrentUser();
+    if (user) {
+        user.signOut();
+    }
+
+    // Remove all tokens from localStorage
+    removeAuthToken();
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('idToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('userInfo');
+
+    // Additional cleanup if needed
+    const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
+    if (clientId) {
+        // Clean up Cognito's specific storage pattern
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.includes('CognitoIdentityServiceProvider') && key.includes(clientId)) {
+                localStorage.removeItem(key);
+            }
+        }
     }
 };

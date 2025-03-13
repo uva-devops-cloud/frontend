@@ -1,7 +1,6 @@
 // src/components/Layout/DashboardLayout.tsx
 import { useNavigate } from 'react-router-dom';
-import { removeAuthToken } from '../../components/resources/AuthUtility';
-import UserPool from '../resources/Cognito';
+import { logOut } from '../../components/resources/AuthUtility';
 import { Outlet } from 'react-router-dom';
 import '../assets/Main.css'
 
@@ -9,13 +8,9 @@ const DashboardLayout = () => {
     const navigate = useNavigate();
 
     const handleLogout = () => {
-        // Sign out from Cognito
-        const user = UserPool.getCurrentUser();
-        if (user) {
-            user.signOut();
-        }
-        // Clear auth token
-        removeAuthToken();
+        // Use the comprehensive logout function
+        logOut();
+
         // Redirect to login
         navigate('/login');
     };

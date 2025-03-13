@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { CognitoUser, AuthenticationDetails, CognitoUserSession } from 'amazon-cognito-identity-js';
+import React, { useState, useEffect, useRef } from 'react'
+import { CognitoUser, AuthenticationDetails } from 'amazon-cognito-identity-js';
 import UserPool from '../resources/Cognito';
 import '../assets/Main.css'
 import email_icon from '../assets/email.png'
@@ -14,6 +14,7 @@ const Login: React.FC = () => {
     const [isProcessingOAuth, setIsProcessingOAuth] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
+    const processedCodes = useRef(new Set());
 
     // Exchange authorization code for tokens
     const exchangeCodeForTokens = async (code: string): Promise<any> => {
@@ -23,29 +24,43 @@ const Login: React.FC = () => {
             const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
             const redirectUri = window.location.origin + '/login';
 
-            // Prepare the token request
+            console.log('Token exchange details:', {
+                cognitoDomain,
+                clientId,
+                redirectUri,
+                codeLength: code?.length || 0
+            });
+
+            // Add timestamp to prevent caching issues
             const tokenRequest = new URLSearchParams();
             tokenRequest.append('grant_type', 'authorization_code');
             tokenRequest.append('client_id', clientId);
             tokenRequest.append('code', code);
             tokenRequest.append('redirect_uri', redirectUri);
 
-            // Make the token request to Cognito
-            const response = await fetch(`https://${cognitoDomain}/oauth2/token`, {
+            // Add cache busting and improved error handling
+            const response = await fetch(`https://${cognitoDomain}/oauth2/token?_=${Date.now()}`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Cache-Control': 'no-cache'
                 },
                 body: tokenRequest
             });
 
+            const responseText = await response.text();
+            console.log('Raw token response:', responseText);
+
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(`Token exchange failed: ${errorData.error_description || response.statusText}`);
+                try {
+                    const errorData = JSON.parse(responseText);
+                    throw new Error(`Token exchange failed: ${errorData.error_description || errorData.error || response.statusText}`);
+                } catch (parseError) {
+                    throw new Error(`Token exchange failed: ${response.status} ${response.statusText}`);
+                }
             }
 
-            // Return the tokens
-            return await response.json();
+            return JSON.parse(responseText);
         } catch (error) {
             console.error('Error exchanging code for tokens:', error);
             throw error;
@@ -77,32 +92,52 @@ const Login: React.FC = () => {
     // Handle OAuth callback
     useEffect(() => {
         const handleOAuthCallback = async () => {
-            // Parse the URL for auth code or token after redirect back from Cognito
             const params = new URLSearchParams(location.search);
             const code = params.get('code');
             const idToken = params.get('id_token');
 
             if (!code && !idToken) return;
 
+            // Check if we've already processed this code
+            if (code && processedCodes.current.has(code)) {
+                console.log('Auth code already processed, skipping');
+                return;
+            }
+
             setIsProcessingOAuth(true);
 
             try {
-                // Case 1: Authorization Code Flow
                 if (code) {
+                    // Mark this code as processed immediately
+                    processedCodes.current.add(code);
+
                     console.log('OAuth code received, exchanging for tokens...');
                     const tokenData = await exchangeCodeForTokens(code);
 
-                    // Store tokens securely
-                    setAuthToken(tokenData.access_token);
+                    // Rest of your code remains the same
+                    localStorage.setItem('accessToken', tokenData.access_token);
                     localStorage.setItem('refreshToken', tokenData.refresh_token);
                     localStorage.setItem('idToken', tokenData.id_token);
 
-                    // Extract user information from ID token
+                    // This is the crucial line - it sets the token for API calls
+                    setAuthToken(tokenData.access_token);
+
+                    // Extract user information
                     const userInfo = parseJwt(tokenData.id_token);
                     console.log('User authenticated:', userInfo.email);
 
+                    // Store the user info
+                    localStorage.setItem('userInfo', JSON.stringify({
+                        email: userInfo.email,
+                        name: userInfo.name || userInfo.email,
+                        sub: userInfo.sub
+                    }));
+
                     // Remove the code from URL to prevent reusing it
                     window.history.replaceState({}, document.title, '/login');
+
+                    // Navigate to dashboard on successful authentication
+                    navigate('/dashboard');
                 }
                 // Case 2: Implicit Flow (token in URL)
                 else if (idToken) {
@@ -128,6 +163,13 @@ const Login: React.FC = () => {
                 // Navigate to dashboard on successful authentication
                 navigate('/dashboard');
             } catch (error) {
+                // Check if we already have tokens despite the error
+                if (localStorage.getItem('accessToken') && localStorage.getItem('idToken')) {
+                    console.log('Tokens already exist, proceeding despite error');
+                    navigate('/dashboard');
+                    return;
+                }
+
                 console.error('OAuth authentication failed:', error);
                 alert('Authentication failed. Please try again.');
             } finally {
