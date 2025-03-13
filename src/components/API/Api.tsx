@@ -10,6 +10,8 @@ export interface Student {
     address: string;
 }
 
+// Commenting out unused interfaces
+/*
 export interface Course {
     id: number;
     course_code: number;
@@ -23,7 +25,7 @@ export interface Program {
     program_name: string;
     director: string;
 }
-
+*/
 
 // Fetch authenticated student data (returns just the user's own data)
 export const fetchStudent = async (): Promise<Student[]> => {
@@ -46,6 +48,8 @@ export const fetchStudent = async (): Promise<Student[]> => {
     }
 };
 
+// Commenting out unused API calls
+/*
 // Fetch courses
 export const fetchCourses = async (): Promise<Course[]> => {
     try {
@@ -87,6 +91,7 @@ export const fetchProgram = async (): Promise<Program[]> => {
         throw error;
     }
 };
+*/
 
 // Post token
 export const postToken = async (token: string): Promise<void> => {
