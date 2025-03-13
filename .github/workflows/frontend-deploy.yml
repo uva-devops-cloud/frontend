@@ -45,6 +45,7 @@ jobs:
         run: |
           echo "VITE_COGNITO_USER_POOL_ID=${{ secrets.COGNITO_USER_POOL_ID }}" > .env
           echo "VITE_COGNITO_CLIENT_ID=${{ secrets.COGNITO_CLIENT_ID }}" >> .env
+          echo "VITE_COGNITO_DOMAIN=studentportal-${{ inputs.aws_account_id }}" >> .env
           cat .env
 
       - name: Set up Node.js
