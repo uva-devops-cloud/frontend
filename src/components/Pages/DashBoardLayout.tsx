@@ -31,9 +31,7 @@ const DashboardLayout = () => {
                             <li className="nav-item">
                                 <a className="nav-link" onClick={() => navigate('/LLM')} style={{ cursor: 'pointer' }}>AI Chatbot</a>
                             </li>
-                            <li className="nav-item">
-                                <a className="nav-link" onClick={() => navigate('/settings')} style={{ cursor: 'pointer' }}>Settings</a>
-                            </li>
+                            {/* Remove the Settings nav item */}
                         </ul>
                         <button className="btn btn-outline-danger" onClick={handleLogout}>Logout</button>
                     </div>

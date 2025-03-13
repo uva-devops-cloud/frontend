@@ -1,4 +1,4 @@
-import { getAuthHeaders } from '../../components/resources/AuthUtility';
+/*import { getAuthHeaders } from '../../components/resources/AuthUtility';
 const endpoint = 'https://d1npgfnzouv53u.cloudfront.net/api'; //API in cloudfront domain
 
 export interface Student {
@@ -25,7 +25,7 @@ export interface Program {
     program_name: string;
     director: string;
 }
-*/
+
 
 // Fetch authenticated student data (returns just the user's own data)
 export const fetchStudent = async (): Promise<Student[]> => {
@@ -91,7 +91,7 @@ export const fetchProgram = async (): Promise<Program[]> => {
         throw error;
     }
 };
-*/
+
 
 // Post token
 export const postToken = async (token: string): Promise<void> => {
@@ -137,4 +137,4 @@ export const updateStudent = async (
         console.error('Error updating student:', error);
         throw error;
     }
-};
+};*/

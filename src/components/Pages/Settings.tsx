@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+/*import { useEffect, useState } from 'react';
 import { fetchStudent, updateStudent, Student } from '../API/Api';
 
 const Settings = () => {
@@ -131,4 +131,4 @@ const Settings = () => {
     );
 };
 
-export default Settings;
+export default Settings;*/

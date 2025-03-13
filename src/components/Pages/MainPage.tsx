@@ -1,24 +1,47 @@
 import { useEffect, useState } from 'react';
-import { fetchStudent, Student } from '../API/Api';
+// import { fetchStudent, Student } from '../API/Api'; // Commented out API import
+import { getCurrentSession } from '../resources/AuthUtility';
+import UserPool from '../resources/Cognito';
 
 const MainPage = () => {
-    const [student, setStudent] = useState<Student[]>([]);
+    // const [student, setStudent] = useState<Student | null>(null); // Commented out API-related state
+    const [cognitoAttributes, setAttributes] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [userInfo, setUserInfo] = useState<any>(null);
 
     useEffect(() => {
         const loadData = async () => {
             setIsLoading(true);
             try {
-                // Get user info from localStorage (set during login)
-                const storedUserInfo = localStorage.getItem('userInfo');
-                if (storedUserInfo) {
-                    setUserInfo(JSON.parse(storedUserInfo));
-                }
+                // First, always try to get data from backend as source of truth
+                // const studentData = await fetchStudent();
+                // if (studentData && studentData.length > 0) {
+                //     setStudent(studentData[0]);
+                // }
 
-                // Optional: Keep the student data fetch if needed
-                const studentData = await fetchStudent();
-                setStudent(studentData);
+                // Get attributes from Cognito
+                try {
+                    const session = await getCurrentSession();
+                    if (session.isValid()) {
+                        const user = UserPool.getCurrentUser();
+                        if (user) {
+                            user.getSession((err: Error | null) => {
+                                if (!err) {
+                                    user.getUserAttributes((err, attributes) => {
+                                        if (!err && attributes) {
+                                            const userAttributes: Record<string, string> = {};
+                                            attributes.forEach(attr => {
+                                                userAttributes[attr.getName()] = attr.getValue();
+                                            });
+                                            setAttributes(userAttributes);
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error fetching Cognito attributes:', error);
+                }
             } catch (error) {
                 console.error('Error fetching data:', error);
             } finally {
@@ -42,22 +65,22 @@ const MainPage = () => {
                             <h5>Student Information</h5>
                         </div>
                         <div className="card-body">
-                            {userInfo ? (
+                            {cognitoAttributes ? (
                                 <div>
-                                    <p><strong>Email:</strong> {userInfo.email}</p>
-                                    <p><strong>Name:</strong> {userInfo.name}</p>
-                                    {/* Add other attributes here as needed */}
+                                    <p><strong>Name:</strong> {cognitoAttributes.name || `${cognitoAttributes.given_name || ''} ${cognitoAttributes.family_name || ''}`}</p>
+                                    <p><strong>Email:</strong> {cognitoAttributes.email}</p>
+                                    <p><strong>Address:</strong> {cognitoAttributes['custom:user_address'] || 'Not provided'}</p>
+
+                                    {/* Display additional attributes from Cognito if available */}
+                                    {cognitoAttributes['custom:birthdate'] && (
+                                        <p><strong>Date of Birth:</strong> {cognitoAttributes['custom:birthdate']}</p>
+                                    )}
+                                    {cognitoAttributes['custom:user_phone'] && typeof cognitoAttributes['custom:user_phone'] === 'string' && (
+                                        <p><strong>Phone Number:</strong> {cognitoAttributes['custom:user_phone']}</p>
+                                    )}
                                 </div>
                             ) : (
-                                student.length > 0 ? (
-                                    <div>
-                                        <p><strong>Name:</strong> {student[0].name}</p>
-                                        <p><strong>Email:</strong> {student[0].email}</p>
-                                        <p><strong>Address:</strong> {student[0].address}</p>
-                                    </div>
-                                ) : (
-                                    <p>No student information available</p>
-                                )
+                                <p>No student information available. Please complete your profile.</p>
                             )}
                         </div>
                     </div>
@@ -85,3 +108,4 @@ const MainPage = () => {
 };
 
 export default MainPage;
+
