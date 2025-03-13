@@ -1,7 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 const LLM = () => {
-    // Add a class to the parent container when this component mounts
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Get Streamlit URL from environment variable or use fallback
+    const streamlitUrl = import.meta.env.VITE_STREAMLIT_URL || 'http://localhost:8501';
+
     useEffect(() => {
         // Add the fullwidth class to the container
         const container = document.querySelector('.container.mt-4');
@@ -19,13 +23,16 @@ const LLM = () => {
 
     return (
         <div className="streamlit-fullwidth">
+            {isLoading && <div className="text-center p-5">Loading Streamlit application...</div>}
             <iframe
-                src="https://your-streamlit-app-url.com"
+                src={streamlitUrl}
                 width="100%"
-                height="calc(100vh - 80px)" // Adjust the 80px based on your navbar height
+                height="calc(100vh - 80px)"
                 frameBorder="0"
                 title="AI Chatbot"
                 allow="microphone"
+                style={{ display: isLoading ? 'none' : 'block' }}
+                onLoad={() => setIsLoading(false)}
             />
         </div>
     );
