@@ -16,16 +16,41 @@ export const updateUserProfile = async (attributes: Array<{ Name: string; Value:
 
         const headers = await getAuthHeaders();
 
-        // For CloudFront requests, don't include /profile
-        const endpoint = isCloudFrontDomain ? `${apiUrl}` : `${apiUrl}/profile`;
-        console.log('Full API endpoint:', endpoint);
+        // Try different API endpoints with fallback
+        let endpoint, response;
 
-        const response = await fetch(endpoint, {
-            method: 'PUT',
-            headers,
-            body: JSON.stringify({ attributes })
-        });
+        try {
+            // First attempt without /profile
+            endpoint = apiUrl;
+            console.log('Trying endpoint:', endpoint);
 
+            response = await fetch(endpoint, {
+                method: 'PUT',
+                headers,
+                body: JSON.stringify({ attributes })
+            });
+
+            console.log('First attempt status:', response.status);
+
+            // If not successful, try with /profile
+            if (!response.ok) {
+                throw new Error('First attempt failed');
+            }
+        } catch (firstError) {
+            // Second attempt with /profile
+            endpoint = `${apiUrl}/profile`;
+            console.log('Trying fallback endpoint:', endpoint);
+
+            response = await fetch(endpoint, {
+                method: 'PUT',
+                headers,
+                body: JSON.stringify({ attributes })
+            });
+
+            console.log('Second attempt status:', response.status);
+        }
+
+        // Process response as before
         console.log('API response status:', response.status);
 
         if (!response.ok) {
