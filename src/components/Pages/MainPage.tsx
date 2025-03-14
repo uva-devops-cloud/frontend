@@ -80,7 +80,27 @@ const MainPage = () => {
                                     )}
                                 </div>
                             ) : (
-                                <p>No student information available. Please complete your profile.</p>
+                                // Try to use localStorage fallback if Cognito attributes aren't available
+                                (() => {
+                                    const fallbackUserData = localStorage.getItem('extendedUserInfo');
+                                    if (fallbackUserData) {
+                                        try {
+                                            const userData = JSON.parse(fallbackUserData);
+                                            return (
+                                                <div>
+                                                    <p><strong>Name:</strong> {userData.name || `${userData.givenName || ''} ${userData.familyName || ''}`}</p>
+                                                    <p><strong>Email:</strong> {userData.email}</p>
+                                                    <p><strong>Address:</strong> {userData.address || 'Not provided'}</p>
+                                                    {userData.birthdate && <p><strong>Date of Birth:</strong> {userData.birthdate}</p>}
+                                                    {userData.phoneNumber && <p><strong>Phone Number:</strong> {userData.phoneNumber}</p>}
+                                                </div>
+                                            );
+                                        } catch (e) {
+                                            return <p>No student information available.</p>;
+                                        }
+                                    }
+                                    return <p>No student information available.</p>;
+                                })()
                             )}
                         </div>
                     </div>

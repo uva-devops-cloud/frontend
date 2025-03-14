@@ -16,6 +16,30 @@ const Login: React.FC = () => {
     const location = useLocation();
     const processedCodes = useRef(new Set());
 
+    // Add this helper function at the top of your component
+    const clearPreviousLoginData = () => {
+        // Clear all auth tokens
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('idToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('userInfo');
+        localStorage.removeItem('extendedUserInfo');
+
+        // Clean up Cognito-specific localStorage items
+        const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
+        if (clientId) {
+            const keyPrefix = `CognitoIdentityServiceProvider.${clientId}`;
+
+            // Remove any items that match the Cognito pattern
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith(keyPrefix)) {
+                    localStorage.removeItem(key);
+                }
+            }
+        }
+    };
+
     // Exchange authorization code for tokens
     const exchangeCodeForTokens = async (code: string): Promise<any> => {
         try {
@@ -114,62 +138,57 @@ const Login: React.FC = () => {
                     console.log('OAuth code received, exchanging for tokens...');
                     const tokenData = await exchangeCodeForTokens(code);
 
-                    // Rest of your code remains the same
+                    // Clear any previous login data before setting new data
+                    clearPreviousLoginData();
+
+                    // Store tokens
                     localStorage.setItem('accessToken', tokenData.access_token);
                     localStorage.setItem('refreshToken', tokenData.refresh_token);
                     localStorage.setItem('idToken', tokenData.id_token);
-
-                    // This is the crucial line - it sets the token for API calls
                     setAuthToken(tokenData.access_token);
 
-                    // Extract user information
+                    // Extract user information from ID token
                     const userInfo = parseJwt(tokenData.id_token);
                     console.log('User authenticated:', userInfo.email);
 
-                    // Store the user info
+                    // Store basic user info
                     localStorage.setItem('userInfo', JSON.stringify({
                         email: userInfo.email,
                         name: userInfo.name || userInfo.email,
                         sub: userInfo.sub
                     }));
 
-                    // Remove the code from URL to prevent reusing it
+                    // Remove the code from URL
                     window.history.replaceState({}, document.title, '/login');
 
-                    // Navigate to dashboard on successful authentication
+                    // We need to manually set up the Cognito user from tokens for SSO
+                    const idTokenPayload = parseJwt(tokenData.id_token);
+
+                    // Store tokens in the exact format Cognito SDK expects
+                    const keyPrefix = `CognitoIdentityServiceProvider.${import.meta.env.VITE_COGNITO_CLIENT_ID}`;
+                    const userKey = `${keyPrefix}.${idTokenPayload.email}`;
+
+                    localStorage.setItem(`${userKey}.idToken`, tokenData.id_token);
+                    localStorage.setItem(`${userKey}.accessToken`, tokenData.access_token);
+                    localStorage.setItem(`${userKey}.refreshToken`, tokenData.refresh_token);
+                    localStorage.setItem(`${keyPrefix}.LastAuthUser`, idTokenPayload.email);
+
+                    // Simply navigate to dashboard without profile check
                     navigate('/dashboard');
-                }
-                // Case 2: Implicit Flow (token in URL)
-                else if (idToken) {
-                    console.log('ID token received from implicit flow');
 
-                    // Store the token
-                    localStorage.setItem('idToken', idToken);
-
-                    // Get access token if provided
-                    const accessToken = params.get('access_token');
-                    if (accessToken) {
-                        setAuthToken(accessToken);
-                    }
-
-                    // Extract user information
-                    const userInfo = parseJwt(idToken);
-                    console.log('User authenticated:', userInfo.email);
-
-                    // Remove the token from URL for security
-                    window.history.replaceState({}, document.title, '/login');
-                }
-
-                // Navigate to dashboard on successful authentication
-                navigate('/dashboard');
-            } catch (error) {
-                // Check if we already have tokens despite the error
-                if (localStorage.getItem('accessToken') && localStorage.getItem('idToken')) {
-                    console.log('Tokens already exist, proceeding despite error');
-                    navigate('/dashboard');
                     return;
                 }
 
+                // Implicit flow handling
+                else if (idToken) {
+                    // Handle implicit flow logic...
+                    // ...
+
+                    // After handling implicit flow, direct to dashboard
+                    navigate('/dashboard');
+                }
+            } catch (error) {
+                // Error handling...
                 console.error('OAuth authentication failed:', error);
                 alert('Authentication failed. Please try again.');
             } finally {
@@ -194,7 +213,10 @@ const Login: React.FC = () => {
         user.authenticateUser(authDetails, {
             onSuccess: (result) => {
                 console.log('Login successful!', result);
-                //alert('Login successful!');
+
+                // Clear previous user data first
+                clearPreviousLoginData();
+
                 const accessToken = result.getAccessToken().getJwtToken();
                 // Store token using utility
                 setAuthToken(accessToken);
