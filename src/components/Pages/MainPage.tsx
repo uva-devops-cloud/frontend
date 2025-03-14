@@ -162,18 +162,6 @@ const MainPage = () => {
         setIsSaving(true);
         setEditMessage(null);
 
-        // Force-check localStorage for SSO status before proceeding
-        // This ensures the most current SSO state
-        const tokenSource = localStorage.getItem('tokenSource');
-        const forceIsSsoUser = tokenSource === 'google';
-
-        console.log("Before save - localStorage tokenSource:", tokenSource);
-        console.log("Before save - forceIsSsoUser:", forceIsSsoUser);
-        console.log("Before save - isSsoUser state:", isSsoUser);
-
-        // Use the forced check OR the state value
-        const isCurrentUserSso = forceIsSsoUser || isSsoUser;
-
         const user = UserPool.getCurrentUser();
         if (!user) {
             setEditMessage({
@@ -185,67 +173,91 @@ const MainPage = () => {
         }
 
         try {
-            // Combine given name and family name for the full name attribute
-            const fullName = `${formData.givenName} ${formData.familyName}`.trim();
+            // For SSO users, only update the custom attributes they're allowed to modify
+            const isCurrentUserSso = localStorage.getItem('tokenSource') === 'google' || isSsoUser;
 
             // Create attribute list for update
-            const attributeList = [
-                { Name: 'name', Value: fullName },
-                { Name: 'given_name', Value: formData.givenName },
-                { Name: 'family_name', Value: formData.familyName },
-                { Name: 'custom:user_address', Value: formData.address },
-                { Name: 'custom:birthdate', Value: formData.birthdate },
-                { Name: 'custom:user_phone', Value: formData.phoneNumber }
-            ];
+            const attributeList: CognitoUserAttribute[] = [];
 
-            if (isCurrentUserSso) {
-                console.log('Detected as SSO user, using API');
-                // For SSO users, use the API endpoint
-                await updateUserProfile(attributeList);
-                refreshUserAttributes();
+            // Always include custom attributes - these should work for all users
+            attributeList.push(
+                new CognitoUserAttribute({ Name: 'custom:user_address', Value: formData.address }),
+                new CognitoUserAttribute({ Name: 'custom:birthdate', Value: formData.birthdate }),
+                new CognitoUserAttribute({ Name: 'custom:user_phone', Value: formData.phoneNumber })
+            );
 
-                setEditMessage({
-                    type: 'success',
-                    text: 'Profile updated successfully!'
-                });
-            } else {
-                console.log('Detected as regular user, using Cognito SDK');
-                // For regular users, use the direct Cognito update
-                console.log('Updating regular user profile via Cognito SDK');
-                await new Promise<void>((resolve, reject) => {
-                    user.getSession((sessionErr: Error | null) => {
-                        if (sessionErr) {
-                            reject(sessionErr);
-                            return;
+            // Only include standard attributes for non-SSO users
+            if (!isCurrentUserSso) {
+                const fullName = `${formData.givenName} ${formData.familyName}`.trim();
+                attributeList.push(
+                    new CognitoUserAttribute({ Name: 'name', Value: fullName }),
+                    new CognitoUserAttribute({ Name: 'given_name', Value: formData.givenName }),
+                    new CognitoUserAttribute({ Name: 'family_name', Value: formData.familyName })
+                );
+            }
+
+            // Use the direct SDK approach for all users
+            await new Promise<void>((resolve, reject) => {
+                user.getSession((sessionErr: Error | null) => {
+                    if (sessionErr) {
+                        reject(sessionErr);
+                        return;
+                    }
+
+                    user.updateAttributes(attributeList, (updateErr) => {
+                        if (updateErr) {
+                            console.error("Update error:", updateErr);
+                            reject(updateErr);
+                        } else {
+                            resolve();
                         }
-
-                        const cognitoAttributeList = attributeList.map(attr =>
-                            new CognitoUserAttribute({ Name: attr.Name, Value: attr.Value })
-                        );
-
-                        user.updateAttributes(cognitoAttributeList, (updateErr) => {
-                            if (updateErr) {
-                                reject(updateErr);
-                            } else {
-                                resolve();
-                            }
-                        });
                     });
                 });
+            });
 
+            // Add a small delay before refreshing to ensure Cognito has processed the update
+            setTimeout(() => {
                 refreshUserAttributes();
+            }, 1000);
 
-                setEditMessage({
-                    type: 'success',
-                    text: 'Profile updated successfully!'
-                });
-            }
+            setEditMessage({
+                type: 'success',
+                text: 'Profile updated successfully!'
+            });
         } catch (error: any) {
             console.error('Error updating profile:', error);
-            setEditMessage({
-                type: 'error',
-                text: error.message || 'Failed to update profile'
-            });
+
+            // If the direct method fails for SSO users, only then fall back to the API
+            if ((localStorage.getItem('tokenSource') === 'google' || isSsoUser)) {
+                console.log("SSO user update failed with error:", error.message);
+                try {
+                    // Fall back to API method for SSO users regardless of specific error message
+                    const attributeList = [
+                        { Name: 'custom:user_address', Value: formData.address },
+                        { Name: 'custom:birthdate', Value: formData.birthdate },
+                        { Name: 'custom:user_phone', Value: formData.phoneNumber }
+                    ];
+
+                    await updateUserProfile(attributeList);
+                    refreshUserAttributes();
+
+                    setEditMessage({
+                        type: 'success',
+                        text: 'Profile updated successfully!'
+                    });
+                } catch (apiError: any) {
+                    console.error("API fallback method failed:", apiError);
+                    setEditMessage({
+                        type: 'error',
+                        text: apiError.message || 'Failed to update profile'
+                    });
+                }
+            } else {
+                setEditMessage({
+                    type: 'error',
+                    text: error.message || 'Failed to update profile'
+                });
+            }
         } finally {
             setIsEditing(false);
             setIsSaving(false);
