@@ -2,15 +2,18 @@ import { useEffect, useState } from 'react';
 import { getCurrentSession } from '../resources/AuthUtility';
 import { CognitoUserAttribute } from 'amazon-cognito-identity-js';
 import UserPool from '../resources/Cognito';
+import { updateUserProfile } from '../API/ProfileAPI';
 
 const MainPage = () => {
+    // Existing state variables remain the same
     const [cognitoAttributes, setAttributes] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [editMessage, setEditMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+    const [isSsoUser, setIsSsoUser] = useState(false);
 
-    // Form state for editable fields - changed to have separate givenName and familyName
+    // Form state remains the same
     const [formData, setFormData] = useState({
         givenName: '',
         familyName: '',
@@ -19,7 +22,31 @@ const MainPage = () => {
         phoneNumber: ''
     });
 
-    // Function to refresh user attributes from Cognito
+    // Function to detect if user is logged in with SSO
+    const detectSsoUser = (attributes: any) => {
+        // Check if user logged in via Google
+        if (attributes.identities) {
+            try {
+                const identities = JSON.parse(attributes.identities);
+                if (identities && identities.length > 0 && identities[0].providerType === 'Google') {
+                    console.log('User authenticated via Google SSO');
+                    return true;
+                }
+            } catch (e) {
+                console.error('Error parsing identities:', e);
+            }
+        }
+
+        // Alternative check based on sub format
+        if (attributes.sub && attributes.sub.startsWith('Google_')) {
+            console.log('User authenticated via Google SSO (detected from sub)');
+            return true;
+        }
+
+        return false;
+    };
+
+    // Function to refresh user attributes - updated to detect SSO
     const refreshUserAttributes = () => {
         const user = UserPool.getCurrentUser();
         if (!user) return;
@@ -33,9 +60,14 @@ const MainPage = () => {
                     attributes.forEach(attr => {
                         userAttributes[attr.getName()] = attr.getValue();
                     });
+
+                    // Detect if the user logged in via SSO
+                    const ssoUser = detectSsoUser(userAttributes);
+                    setIsSsoUser(ssoUser);
+
                     setAttributes(userAttributes);
 
-                    // Initialize form data with current values - now split into givenName and familyName
+                    // Initialize form data with current values
                     setFormData({
                         givenName: userAttributes.given_name || '',
                         familyName: userAttributes.family_name || '',
@@ -78,7 +110,8 @@ const MainPage = () => {
         });
     };
 
-    const handleSave = () => {
+    // Updated handleSave function to use the API for SSO users
+    const handleSave = async () => {
         setIsSaving(true);
         setEditMessage(null);
 
@@ -92,59 +125,71 @@ const MainPage = () => {
             return;
         }
 
-        user.getSession((err: Error | null) => {
-            if (err) {
-                setEditMessage({
-                    type: 'error',
-                    text: 'Session error. Please try logging in again.'
-                });
-                setIsSaving(false);
-                return;
-            }
-
+        try {
             // Combine given name and family name for the full name attribute
             const fullName = `${formData.givenName} ${formData.familyName}`.trim();
 
             // Create attribute list for update
             const attributeList = [
-                new CognitoUserAttribute({ Name: 'name', Value: fullName }),
-                new CognitoUserAttribute({ Name: 'given_name', Value: formData.givenName }),
-                new CognitoUserAttribute({ Name: 'family_name', Value: formData.familyName }),
-                new CognitoUserAttribute({ Name: 'custom:user_address', Value: formData.address }),
-                new CognitoUserAttribute({ Name: 'custom:birthdate', Value: formData.birthdate }),
-                new CognitoUserAttribute({ Name: 'custom:user_phone', Value: formData.phoneNumber })
+                { Name: 'name', Value: fullName },
+                { Name: 'given_name', Value: formData.givenName },
+                { Name: 'family_name', Value: formData.familyName },
+                { Name: 'custom:user_address', Value: formData.address },
+                { Name: 'custom:birthdate', Value: formData.birthdate },
+                { Name: 'custom:user_phone', Value: formData.phoneNumber }
             ];
 
-            user.updateAttributes(attributeList, (updateErr) => {
-                if (updateErr) {
-                    console.error('Error updating attributes:', updateErr);
-
-                    if (updateErr.message && updateErr.message.includes('scopes')) {
-                        setEditMessage({
-                            type: 'error',
-                            text: 'Authentication error: Your account type does not have permission to update attributes. Please contact support.'
-                        });
-                    } else {
-                        setEditMessage({
-                            type: 'error',
-                            text: `Failed to update profile: ${updateErr.message}`
-                        });
-                    }
-                    setIsSaving(false);
-                    return;
-                }
-
-                // After successful update, refresh the attributes from Cognito
+            if (isSsoUser) {
+                // For SSO users, use the API endpoint
+                console.log('Updating SSO user profile via API');
+                await updateUserProfile(attributeList);
                 refreshUserAttributes();
 
                 setEditMessage({
                     type: 'success',
                     text: 'Profile updated successfully!'
                 });
-                setIsEditing(false);
-                setIsSaving(false);
+            } else {
+                // For regular users, use the direct Cognito update
+                console.log('Updating regular user profile via Cognito SDK');
+                await new Promise<void>((resolve, reject) => {
+                    user.getSession((sessionErr: Error | null) => {
+                        if (sessionErr) {
+                            reject(sessionErr);
+                            return;
+                        }
+
+                        const cognitoAttributeList = attributeList.map(attr =>
+                            new CognitoUserAttribute({ Name: attr.Name, Value: attr.Value })
+                        );
+
+                        user.updateAttributes(cognitoAttributeList, (updateErr) => {
+                            if (updateErr) {
+                                reject(updateErr);
+                            } else {
+                                resolve();
+                            }
+                        });
+                    });
+                });
+
+                refreshUserAttributes();
+
+                setEditMessage({
+                    type: 'success',
+                    text: 'Profile updated successfully!'
+                });
+            }
+        } catch (error: any) {
+            console.error('Error updating profile:', error);
+            setEditMessage({
+                type: 'error',
+                text: error.message || 'Failed to update profile'
             });
-        });
+        } finally {
+            setIsEditing(false);
+            setIsSaving(false);
+        }
     };
 
     const handleCancel = () => {
