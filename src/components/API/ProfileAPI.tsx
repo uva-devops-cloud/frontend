@@ -3,7 +3,7 @@ import { getAuthHeaders } from '../resources/AuthUtility';
 // Base API URL - Use CloudFront path pattern when deployed
 const isCloudFrontDomain = window.location.hostname.includes('cloudfront.net');
 const apiUrl = isCloudFrontDomain
-    ? '/api/dev'  // Add /dev here to complete the correct path
+    ? '/api'  // REMOVE the /dev since CloudFront origin_path already has it
     : (import.meta.env.VITE_API_URL || 'https://3q336xufi6.execute-api.eu-west-2.amazonaws.com/dev');
 
 /**
@@ -30,11 +30,15 @@ export const updateUserProfile = async (attributes: Array<{ Name: string; Value:
         if (!response.ok) {
             const errorText = await response.text();
             console.error('API error response:', errorText);
+            console.error('Response headers:', Object.fromEntries([...response.headers]));
 
             try {
                 const errorData = JSON.parse(errorText);
                 throw new Error(errorData.error || `Request failed with status ${response.status}`);
-            } catch (e) {
+            } catch (parseError) {
+                console.error('Failed to parse error response:', parseError);
+                // Log the first 200 characters of the response for debugging
+                console.error('Raw response preview:', errorText.substring(0, 200));
                 throw new Error(`API request failed with status ${response.status}`);
             }
         }
