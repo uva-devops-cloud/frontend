@@ -10,46 +10,52 @@ const MainPage = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [editMessage, setEditMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
-    // Form state for editable fields
+    // Form state for editable fields - changed to have separate givenName and familyName
     const [formData, setFormData] = useState({
-        name: '',
+        givenName: '',
+        familyName: '',
         address: '',
         birthdate: '',
         phoneNumber: ''
     });
 
+    // Function to refresh user attributes from Cognito
+    const refreshUserAttributes = () => {
+        const user = UserPool.getCurrentUser();
+        if (!user) return;
+
+        user.getSession((err: Error | null) => {
+            if (err) return;
+
+            user.getUserAttributes((attrErr, attributes) => {
+                if (!attrErr && attributes) {
+                    const userAttributes: Record<string, string> = {};
+                    attributes.forEach(attr => {
+                        userAttributes[attr.getName()] = attr.getValue();
+                    });
+                    setAttributes(userAttributes);
+
+                    // Initialize form data with current values - now split into givenName and familyName
+                    setFormData({
+                        givenName: userAttributes.given_name || '',
+                        familyName: userAttributes.family_name || '',
+                        address: userAttributes['custom:user_address'] || '',
+                        birthdate: userAttributes['custom:birthdate'] || '',
+                        phoneNumber: userAttributes['custom:user_phone'] || ''
+                    });
+                }
+            });
+        });
+    };
+
     useEffect(() => {
         const loadData = async () => {
             setIsLoading(true);
             try {
-                // Get attributes from Cognito
                 try {
                     const session = await getCurrentSession();
                     if (session.isValid()) {
-                        const user = UserPool.getCurrentUser();
-                        if (user) {
-                            user.getSession((err: Error | null) => {
-                                if (!err) {
-                                    user.getUserAttributes((err, attributes) => {
-                                        if (!err && attributes) {
-                                            const userAttributes: Record<string, string> = {};
-                                            attributes.forEach(attr => {
-                                                userAttributes[attr.getName()] = attr.getValue();
-                                            });
-                                            setAttributes(userAttributes);
-
-                                            // Initialize form data with current values
-                                            setFormData({
-                                                name: userAttributes.name || `${userAttributes.given_name || ''} ${userAttributes.family_name || ''}`,
-                                                address: userAttributes['custom:user_address'] || '',
-                                                birthdate: userAttributes['custom:birthdate'] || '',
-                                                phoneNumber: userAttributes['custom:user_phone'] || ''
-                                            });
-                                        }
-                                    });
-                                }
-                            });
-                        }
+                        refreshUserAttributes();
                     }
                 } catch (error) {
                     console.error('Error fetching Cognito attributes:', error);
@@ -96,25 +102,14 @@ const MainPage = () => {
                 return;
             }
 
-            // Split name into given_name and family_name if possible
-            let givenName = '';
-            let familyName = '';
-
-            // Attempt to split the name by the last space
-            const nameParts = formData.name.trim().split(/\s+/);
-            if (nameParts.length > 1) {
-                givenName = nameParts.slice(0, -1).join(' ');
-                familyName = nameParts[nameParts.length - 1];
-            } else {
-                // If there's only one part, use it as given_name
-                givenName = formData.name;
-            }
+            // Combine given name and family name for the full name attribute
+            const fullName = `${formData.givenName} ${formData.familyName}`.trim();
 
             // Create attribute list for update
             const attributeList = [
-                new CognitoUserAttribute({ Name: 'name', Value: formData.name }),
-                new CognitoUserAttribute({ Name: 'given_name', Value: givenName }),
-                new CognitoUserAttribute({ Name: 'family_name', Value: familyName }),
+                new CognitoUserAttribute({ Name: 'name', Value: fullName }),
+                new CognitoUserAttribute({ Name: 'given_name', Value: formData.givenName }),
+                new CognitoUserAttribute({ Name: 'family_name', Value: formData.familyName }),
                 new CognitoUserAttribute({ Name: 'custom:user_address', Value: formData.address }),
                 new CognitoUserAttribute({ Name: 'custom:birthdate', Value: formData.birthdate }),
                 new CognitoUserAttribute({ Name: 'custom:user_phone', Value: formData.phoneNumber })
@@ -123,51 +118,40 @@ const MainPage = () => {
             user.updateAttributes(attributeList, (updateErr) => {
                 if (updateErr) {
                     console.error('Error updating attributes:', updateErr);
-                    setEditMessage({
-                        type: 'error',
-                        text: `Failed to update profile: ${updateErr.message}`
-                    });
+
+                    if (updateErr.message && updateErr.message.includes('scopes')) {
+                        setEditMessage({
+                            type: 'error',
+                            text: 'Authentication error: Your account type does not have permission to update attributes. Please contact support.'
+                        });
+                    } else {
+                        setEditMessage({
+                            type: 'error',
+                            text: `Failed to update profile: ${updateErr.message}`
+                        });
+                    }
                     setIsSaving(false);
                     return;
                 }
 
-                // If successful, update state
-                const updatedAttributes = { ...cognitoAttributes };
-                updatedAttributes.name = formData.name;
-                updatedAttributes.given_name = givenName;
-                updatedAttributes.family_name = familyName;
-                updatedAttributes['custom:user_address'] = formData.address;
-                updatedAttributes['custom:birthdate'] = formData.birthdate;
-                updatedAttributes['custom:user_phone'] = formData.phoneNumber;
+                // After successful update, refresh the attributes from Cognito
+                refreshUserAttributes();
 
-                setAttributes(updatedAttributes);
                 setEditMessage({
                     type: 'success',
                     text: 'Profile updated successfully!'
                 });
                 setIsEditing(false);
                 setIsSaving(false);
-
-                // Store in localStorage as fallback
-                const localStorageData = {
-                    name: formData.name,
-                    givenName,
-                    familyName,
-                    email: cognitoAttributes.email,
-                    address: formData.address,
-                    birthdate: formData.birthdate,
-                    phoneNumber: formData.phoneNumber
-                };
-
-                localStorage.setItem('extendedUserInfo', JSON.stringify(localStorageData));
             });
         });
     };
 
     const handleCancel = () => {
-        // Reset form data to current values
+        // Reset form data to current values from Cognito attributes
         setFormData({
-            name: cognitoAttributes.name || `${cognitoAttributes.given_name || ''} ${cognitoAttributes.family_name || ''}`,
+            givenName: cognitoAttributes.given_name || '',
+            familyName: cognitoAttributes.family_name || '',
             address: cognitoAttributes['custom:user_address'] || '',
             birthdate: cognitoAttributes['custom:birthdate'] || '',
             phoneNumber: cognitoAttributes['custom:user_phone'] || ''
@@ -223,15 +207,26 @@ const MainPage = () => {
                             {cognitoAttributes ? (
                                 <div>
                                     {isEditing ? (
-                                        // Edit mode
+                                        // Edit mode with separate givenName and familyName fields
                                         <>
                                             <div className="mb-3">
-                                                <label className="form-label"><strong>Name:</strong></label>
+                                                <label className="form-label"><strong>First Name:</strong></label>
                                                 <input
                                                     type="text"
                                                     className="form-control"
-                                                    name="name"
-                                                    value={formData.name}
+                                                    name="givenName"
+                                                    value={formData.givenName}
+                                                    onChange={handleInputChange}
+                                                />
+                                            </div>
+
+                                            <div className="mb-3">
+                                                <label className="form-label"><strong>Last Name:</strong></label>
+                                                <input
+                                                    type="text"
+                                                    className="form-control"
+                                                    name="familyName"
+                                                    value={formData.familyName}
                                                     onChange={handleInputChange}
                                                 />
                                             </div>
@@ -283,7 +278,7 @@ const MainPage = () => {
                                             </div>
                                         </>
                                     ) : (
-                                        // View mode
+                                        // View mode - display directly from cognitoAttributes
                                         <>
                                             <p><strong>Name:</strong> {cognitoAttributes.name || `${cognitoAttributes.given_name || ''} ${cognitoAttributes.family_name || ''}`}</p>
                                             <p><strong>Email:</strong> {cognitoAttributes.email}</p>
@@ -292,34 +287,14 @@ const MainPage = () => {
                                             {cognitoAttributes['custom:birthdate'] && (
                                                 <p><strong>Date of Birth:</strong> {cognitoAttributes['custom:birthdate']}</p>
                                             )}
-                                            {cognitoAttributes['custom:user_phone'] && typeof cognitoAttributes['custom:user_phone'] === 'string' && (
+                                            {cognitoAttributes['custom:user_phone'] && (
                                                 <p><strong>Phone Number:</strong> {cognitoAttributes['custom:user_phone']}</p>
                                             )}
                                         </>
                                     )}
                                 </div>
                             ) : (
-                                // Fallback to localStorage if Cognito attributes aren't available
-                                (() => {
-                                    const fallbackUserData = localStorage.getItem('extendedUserInfo');
-                                    if (fallbackUserData) {
-                                        try {
-                                            const userData = JSON.parse(fallbackUserData);
-                                            return (
-                                                <div>
-                                                    <p><strong>Name:</strong> {userData.name || `${userData.givenName || ''} ${userData.familyName || ''}`}</p>
-                                                    <p><strong>Email:</strong> {userData.email}</p>
-                                                    <p><strong>Address:</strong> {userData.address || 'Not provided'}</p>
-                                                    {userData.birthdate && <p><strong>Date of Birth:</strong> {userData.birthdate}</p>}
-                                                    {userData.phoneNumber && <p><strong>Phone Number:</strong> {userData.phoneNumber}</p>}
-                                                </div>
-                                            );
-                                        } catch (e) {
-                                            return <p>No student information available.</p>;
-                                        }
-                                    }
-                                    return <p>No student information available.</p>;
-                                })()
+                                <p>No user information available. Please sign in again.</p>
                             )}
                         </div>
                     </div>
