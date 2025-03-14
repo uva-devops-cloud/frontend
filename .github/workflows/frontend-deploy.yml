@@ -18,6 +18,8 @@ on:
         required: true
       STREAMLIT_URL:
         required: true
+      API_URL:
+        required: true
 
 permissions:
   id-token: write
@@ -42,13 +44,14 @@ jobs:
           role-session-name: GitHubFrontendSession
           aws-region: ${{ env.AWS_REGION }}
 
-      # Create .env file with environment variables
+      # Simplified .env file creation with correct secrets references
       - name: Create .env file
         run: |
           echo "VITE_COGNITO_USER_POOL_ID=${{ secrets.COGNITO_USER_POOL_ID }}" > .env
           echo "VITE_COGNITO_CLIENT_ID=${{ secrets.COGNITO_CLIENT_ID }}" >> .env
           echo "VITE_COGNITO_DOMAIN=studentportal-${{ inputs.aws_account_id }}" >> .env
           echo "VITE_STREAMLIT_URL=${{ secrets.STREAMLIT_URL }}" >> .env
+          echo "VITE_API_URL=${{ secrets.API_URL }}" >> .env
           cat .env
 
       - name: Set up Node.js
@@ -63,7 +66,7 @@ jobs:
         run: npm run build
 
       - name: Sync S3 bucket
-        run: aws s3 sync ./dist s3://studentportal-frontend-bucket-474668415523 --delete
+        run: aws s3 sync ./dist s3://studentportal-frontend-bucket-${{inputs.aws_account_id}} --delete
 
       - name: Invalidate CloudFront cache
         run: aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"

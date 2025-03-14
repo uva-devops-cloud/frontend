@@ -1,7 +1,7 @@
 import { getAuthHeaders } from '../resources/AuthUtility';
 
 // Base API URL
-const apiUrl = 'https://d1npgfnzouv53u.cloudfront.net/api'; // Use your actual API endpoint
+const apiUrl = import.meta.env.VITE_API_URL || 'https://d1npgfnzouv53u.cloudfront.net/api'; // Use your actual API endpoint
 
 /**
  * Updates user profile attributes through the backend API

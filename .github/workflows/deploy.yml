@@ -22,7 +22,8 @@ jobs:
       CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID_DEV }}
       COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID_DEV }}
       COGNITO_CLIENT_ID: ${{ secrets.COGNITO_CLIENT_ID_DEV }}
-      STREAMLIT_URL: ${{ secrets.STREAMLIT_URL }}
+      STREAMLIT_URL: ${{ secrets.STREAMLIT_URL_DEV }}
+      API_URL: ${{ secrets.API_URL_DEV }}
 
   deploy-prod:
     name: Deploy to Prod
@@ -36,4 +37,5 @@ jobs:
       CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID_PROD }}
       COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID_PROD }}
       COGNITO_CLIENT_ID: ${{ secrets.COGNITO_CLIENT_ID_PROD }}
-      STREAMLIT_URL: ${{ secrets.STREAMLIT_URL }}
+      STREAMLIT_URL: ${{ secrets.STREAMLIT_URL_PROD }}
+      API_URL: ${{ secrets.API_URL_PROD }}
