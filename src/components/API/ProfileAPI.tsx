@@ -1,7 +1,10 @@
 import { getAuthHeaders } from '../resources/AuthUtility';
 
-// Base API URL
-const apiUrl = import.meta.env.VITE_API_URL || 'https://3q336xufi6.execute-api.eu-west-2.amazonaws.com/dev';
+// Base API URL - Use CloudFront path pattern when deployed
+const isCloudFrontDomain = window.location.hostname.includes('cloudfront.net');
+const apiUrl = isCloudFrontDomain
+    ? '/api'
+    : (import.meta.env.VITE_API_URL || 'https://3q336xufi6.execute-api.eu-west-2.amazonaws.com/dev');
 
 /**
  * Updates user profile attributes through the backend API

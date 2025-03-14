@@ -269,6 +269,8 @@ const MainPage = () => {
         return <div>Loading...</div>;
     }
 
+    console.log("Rendering MainPage, isEditing:", isEditing);
+
     return (
         <div>
             <div className="row">
@@ -279,7 +281,10 @@ const MainPage = () => {
                             {!isEditing ? (
                                 <button
                                     className="btn btn-outline-primary btn-sm"
-                                    onClick={() => setIsEditing(true)}
+                                    onClick={() => {
+                                        console.log("Edit button clicked, setting isEditing to true");
+                                        setIsEditing(true);
+                                    }}
                                 >
                                     Edit
                                 </button>
