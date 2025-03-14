@@ -3,7 +3,7 @@ import { getAuthHeaders } from '../resources/AuthUtility';
 // Base API URL - Use CloudFront path pattern when deployed
 const isCloudFrontDomain = window.location.hostname.includes('cloudfront.net');
 const apiUrl = isCloudFrontDomain
-    ? '/api'  // REMOVE the /dev since CloudFront origin_path already has it
+    ? '/api'  // Keep this as /api
     : (import.meta.env.VITE_API_URL || 'https://3q336xufi6.execute-api.eu-west-2.amazonaws.com/dev');
 
 /**
@@ -13,13 +13,14 @@ const apiUrl = isCloudFrontDomain
 export const updateUserProfile = async (attributes: Array<{ Name: string; Value: string }>) => {
     try {
         console.log('Updating profile via API:', apiUrl);
-        console.log('Attributes:', attributes);
 
         const headers = await getAuthHeaders();
-        console.log('Auth headers:', headers);
 
-        // The endpoint now becomes /api/dev/profile when running on CloudFront
-        const response = await fetch(`${apiUrl}/profile`, {
+        // For CloudFront requests, don't include /profile
+        const endpoint = isCloudFrontDomain ? `${apiUrl}` : `${apiUrl}/profile`;
+        console.log('Full API endpoint:', endpoint);
+
+        const response = await fetch(endpoint, {
             method: 'PUT',
             headers,
             body: JSON.stringify({ attributes })
