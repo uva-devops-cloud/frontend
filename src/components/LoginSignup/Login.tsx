@@ -145,6 +145,8 @@ const Login: React.FC = () => {
                     localStorage.setItem('accessToken', tokenData.access_token);
                     localStorage.setItem('refreshToken', tokenData.refresh_token);
                     localStorage.setItem('idToken', tokenData.id_token);
+                    localStorage.setItem('tokenSource', 'google');
+                    localStorage.setItem('tokenTimestamp', Date.now().toString());
                     setAuthToken(tokenData.access_token);
 
                     // Extract user information from ID token
@@ -200,6 +202,9 @@ const Login: React.FC = () => {
     }, [location, navigate]);
 
     const signIn = (email: string, password: string) => {
+        // Clear any previous SSO indicators
+        localStorage.removeItem('tokenSource');
+
         const user = new CognitoUser({
             Username: email,
             Pool: UserPool,

@@ -24,12 +24,20 @@ const MainPage = () => {
 
     // Function to detect if user is logged in with SSO
     const detectSsoUser = (attributes: any) => {
-        // Check if user logged in via Google
+        console.log("Running SSO detection with attributes:", attributes);
+
+        // First check for identities (most reliable method)
         if (attributes.identities) {
             try {
+                console.log("Raw identities:", attributes.identities);
                 const identities = JSON.parse(attributes.identities);
-                if (identities && identities.length > 0 && identities[0].providerType === 'Google') {
-                    console.log('User authenticated via Google SSO');
+                if (identities && identities.length > 0 &&
+                    (identities[0].providerType === 'Google' ||
+                        identities[0].providerName === 'Google')) {
+                    console.log('User authenticated via Google SSO (from identities)');
+
+                    // If this is definitely an SSO user, make sure localStorage is consistent
+                    localStorage.setItem('tokenSource', 'google');
                     return true;
                 }
             } catch (e) {
@@ -37,12 +45,24 @@ const MainPage = () => {
             }
         }
 
-        // Alternative check based on sub format
-        if (attributes.sub && attributes.sub.startsWith('Google_')) {
-            console.log('User authenticated via Google SSO (detected from sub)');
-            return true;
+        // If no identities but tokenSource exists, check if it's from a recent login
+        // This handles the case where attributes haven't been fully loaded yet
+        const tokenSource = localStorage.getItem('tokenSource');
+        if (tokenSource === 'google') {
+            const timestamp = localStorage.getItem('tokenTimestamp');
+            const currentTime = new Date().getTime();
+
+            // Only trust localStorage tokenSource if it's recent (1 hour)
+            if (timestamp && (currentTime - parseInt(timestamp)) < 3600000) {
+                console.log('User authenticated via Google SSO (from recent localStorage)');
+                return true;
+            } else {
+                // Clear outdated tokenSource
+                localStorage.removeItem('tokenSource');
+            }
         }
 
+        console.log('User is not detected as SSO user');
         return false;
     };
 
@@ -61,14 +81,41 @@ const MainPage = () => {
                         userAttributes[attr.getName()] = attr.getValue();
                     });
 
+                    console.log("All user attributes:", userAttributes); // Add this line
+
+                    // Check sub attribute specifically
+                    console.log("Sub attribute:", userAttributes.sub);
+
+                    // Check identities attribute
+                    if (userAttributes.identities) {
+                        console.log("Identities attribute:", userAttributes.identities);
+                        try {
+                            const identities = JSON.parse(userAttributes.identities);
+                            console.log("Parsed identities:", identities);
+                        } catch (e) {
+                            console.error("Failed to parse identities:", e);
+                        }
+                    } else {
+                        console.log("No identities attribute found");
+                    }
+
                     // Detect if the user logged in via SSO
                     const ssoUser = detectSsoUser(userAttributes);
+                    console.log("Is SSO user detected:", ssoUser);
                     setIsSsoUser(ssoUser);
 
                     setAttributes(userAttributes);
 
                     // Initialize form data with current values
                     setFormData({
+                        givenName: userAttributes.given_name || '',
+                        familyName: userAttributes.family_name || '',
+                        address: userAttributes['custom:user_address'] || '',
+                        birthdate: userAttributes['custom:birthdate'] || '',
+                        phoneNumber: userAttributes['custom:user_phone'] || ''
+                    });
+
+                    console.log("Form data being initialized with:", {
                         givenName: userAttributes.given_name || '',
                         familyName: userAttributes.family_name || '',
                         address: userAttributes['custom:user_address'] || '',
@@ -115,6 +162,18 @@ const MainPage = () => {
         setIsSaving(true);
         setEditMessage(null);
 
+        // Force-check localStorage for SSO status before proceeding
+        // This ensures the most current SSO state
+        const tokenSource = localStorage.getItem('tokenSource');
+        const forceIsSsoUser = tokenSource === 'google';
+
+        console.log("Before save - localStorage tokenSource:", tokenSource);
+        console.log("Before save - forceIsSsoUser:", forceIsSsoUser);
+        console.log("Before save - isSsoUser state:", isSsoUser);
+
+        // Use the forced check OR the state value
+        const isCurrentUserSso = forceIsSsoUser || isSsoUser;
+
         const user = UserPool.getCurrentUser();
         if (!user) {
             setEditMessage({
@@ -139,9 +198,9 @@ const MainPage = () => {
                 { Name: 'custom:user_phone', Value: formData.phoneNumber }
             ];
 
-            if (isSsoUser) {
+            if (isCurrentUserSso) {
+                console.log('Detected as SSO user, using API');
                 // For SSO users, use the API endpoint
-                console.log('Updating SSO user profile via API');
                 await updateUserProfile(attributeList);
                 refreshUserAttributes();
 
@@ -150,6 +209,7 @@ const MainPage = () => {
                     text: 'Profile updated successfully!'
                 });
             } else {
+                console.log('Detected as regular user, using Cognito SDK');
                 // For regular users, use the direct Cognito update
                 console.log('Updating regular user profile via Cognito SDK');
                 await new Promise<void>((resolve, reject) => {

@@ -45,17 +45,29 @@ export const getCurrentSession = async (): Promise<CognitoUserSession> => {
 };
 
 // Get authenticated headers with JWT token
-export const getAuthHeaders = async (): Promise<HeadersInit> => {
+export const getAuthHeaders = async (): Promise<Record<string, string>> => {
     try {
+        // Get the JWT token
         const session = await getCurrentSession();
-        const token = session.getAccessToken().getJwtToken();
+        const token = session.getIdToken().getJwtToken();
+
         return {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
         };
     } catch (error) {
-        console.error('Not authenticated', error);
-        throw new Error('Authentication required');
+        console.error("Error getting authentication headers:", error);
+
+        // Fallback: try to get token from localStorage
+        const idToken = localStorage.getItem('idToken');
+        if (idToken) {
+            return {
+                'Authorization': `Bearer ${idToken}`,
+                'Content-Type': 'application/json'
+            };
+        }
+
+        throw new Error("Failed to get authentication headers");
     }
 };
 
