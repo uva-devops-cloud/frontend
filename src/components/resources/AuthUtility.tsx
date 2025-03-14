@@ -1,4 +1,4 @@
-import UserPool from './Cognito'; // Update the path to the correct location of the Cognito module
+import UserPool from './Cognito';
 import { CognitoUserSession } from 'amazon-cognito-identity-js';
 
 // Store the JWT token in localStorage
@@ -16,41 +16,29 @@ export const removeAuthToken = (): void => {
     localStorage.removeItem('authToken');
 };
 
-// Define a type that represents both session types
-interface SessionLike {
-    isValid(): boolean;
-    getIdToken(): { getJwtToken(): string };
-    getAccessToken(): { getJwtToken(): string };
-}
-
 // Get current authenticated user session
-export const getCurrentSession = async (): Promise<SessionLike> => {
+export const getCurrentSession = async (): Promise<CognitoUserSession> => {
     return new Promise((resolve, reject) => {
-        // First, try the standard Cognito session check
+        // Check for Cognito session
         const user = UserPool.getCurrentUser();
         if (user) {
             user.getSession((err: Error | null, session: CognitoUserSession | null) => {
                 if (err) {
+                    console.error("Session error:", err);
                     reject(err);
                     return;
                 }
-                resolve(session as SessionLike);
+
+                if (session && session.isValid()) {
+                    console.log("Valid session found");
+                    resolve(session);
+                } else {
+                    console.error("Invalid session");
+                    reject(new Error('Invalid session'));
+                }
             });
-        }
-        // If no Cognito session but we have tokens from Google SSO
-        else if (localStorage.getItem('accessToken') && localStorage.getItem('idToken')) {
-            resolve({
-                isValid: () => true,
-                getIdToken: () => ({
-                    getJwtToken: () => localStorage.getItem('idToken') || ''
-                }),
-                getAccessToken: () => ({
-                    getJwtToken: () => localStorage.getItem('accessToken') || ''
-                })
-            });
-        }
-        // No valid session found
-        else {
+        } else {
+            console.error("No user found in Cognito user pool");
             reject(new Error('No user found'));
         }
     });
@@ -58,20 +46,9 @@ export const getCurrentSession = async (): Promise<SessionLike> => {
 
 // Get authenticated headers with JWT token
 export const getAuthHeaders = async (): Promise<HeadersInit> => {
-    // First try from localStorage for performance
-    const storedToken = getAuthToken();
-    if (storedToken) {
-        return {
-            'Authorization': `Bearer ${storedToken}`,
-            'Content-Type': 'application/json'
-        };
-    }
-
-    // If not in localStorage, try to get from current session
     try {
         const session = await getCurrentSession();
         const token = session.getAccessToken().getJwtToken();
-        setAuthToken(token); // Store for future use
         return {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -82,30 +59,11 @@ export const getAuthHeaders = async (): Promise<HeadersInit> => {
     }
 };
 
-// Complete logout function that cleans up all auth tokens
+// Complete logout function that cleans up Cognito session
 export const logOut = (): void => {
     // Sign out from Cognito if there's a user session
     const user = UserPool.getCurrentUser();
     if (user) {
         user.signOut();
-    }
-
-    // Remove all tokens from localStorage
-    removeAuthToken();
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('idToken');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('userInfo');
-
-    // Additional cleanup if needed
-    const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
-    if (clientId) {
-        // Clean up Cognito's specific storage pattern
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && key.includes('CognitoIdentityServiceProvider') && key.includes(clientId)) {
-                localStorage.removeItem(key);
-            }
-        }
     }
 };

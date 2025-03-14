@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { getCurrentSession } from '../../components/resources/AuthUtility';
+import UserPool from './Cognito';
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
@@ -11,9 +11,30 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
     useEffect(() => {
         const checkAuth = async () => {
+            const user = UserPool.getCurrentUser();
+
+            if (!user) {
+                console.log("No user found in Cognito");
+                setIsAuthenticated(false);
+                return;
+            }
+
             try {
-                await getCurrentSession();
-                setIsAuthenticated(true);
+                user.getSession((err: Error | null, session: any) => {
+                    if (err) {
+                        console.error("Session error:", err);
+                        setIsAuthenticated(false);
+                        return;
+                    }
+
+                    if (session && session.isValid()) {
+                        console.log("Valid session found, user authenticated");
+                        setIsAuthenticated(true);
+                    } else {
+                        console.log("Invalid session");
+                        setIsAuthenticated(false);
+                    }
+                });
             } catch (error) {
                 console.error('Authentication check failed:', error);
                 setIsAuthenticated(false);

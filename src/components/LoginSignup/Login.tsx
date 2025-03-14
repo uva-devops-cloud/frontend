@@ -213,13 +213,7 @@ const Login: React.FC = () => {
         user.authenticateUser(authDetails, {
             onSuccess: (result) => {
                 console.log('Login successful!', result);
-
-                // Clear previous user data first
-                clearPreviousLoginData();
-
-                const accessToken = result.getAccessToken().getJwtToken();
-                // Store token using utility
-                setAuthToken(accessToken);
+                // Navigate immediately after successful login
                 navigate('/dashboard');
             },
             onFailure: (err) => {
@@ -227,7 +221,9 @@ const Login: React.FC = () => {
                 alert(err.message || 'Login failed');
             },
         });
-        setEmail(''); setPassword('');
+
+        setEmail('');
+        setPassword('');
     }
 
     const handleGoogleSignIn = () => {
