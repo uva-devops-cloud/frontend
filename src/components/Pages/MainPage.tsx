@@ -22,6 +22,8 @@ const MainPage = () => {
         phoneNumber: ''
     });
 
+
+
     // Function to detect if user is logged in with SSO
     const detectSsoUser = (attributes: any) => {
         console.log("Running SSO detection with attributes:", attributes);
@@ -82,6 +84,18 @@ const MainPage = () => {
                     });
 
                     console.log("All user attributes:", userAttributes); // Add this line
+
+                    // For SSO users, ensure we populate at least the email
+                    if (!userAttributes.given_name && !userAttributes.family_name && userAttributes.email) {
+                        // Use email as fallback for name if nothing else available
+                        const emailUsername = userAttributes.email.split('@')[0];
+                        userAttributes.given_name = userAttributes.given_name || emailUsername;
+
+                        // Set name for display purposes if not available
+                        if (!userAttributes.name) {
+                            userAttributes.name = userAttributes.email;
+                        }
+                    }
 
                     // Check sub attribute specifically
                     console.log("Sub attribute:", userAttributes.sub);
@@ -173,30 +187,52 @@ const MainPage = () => {
         }
 
         try {
-            // For SSO users, only update the custom attributes they're allowed to modify
+            // For SSO users, skip direct update attempt and go straight to API
             const isCurrentUserSso = localStorage.getItem('tokenSource') === 'google' || isSsoUser;
 
+            if (isCurrentUserSso) {
+                console.log("SSO user detected, using API update method directly");
+                // Create attribute list for API update
+                const attributeList = [
+                    { Name: 'custom:user_address', Value: formData.address },
+                    { Name: 'custom:birthdate', Value: formData.birthdate },
+                    { Name: 'custom:user_phone', Value: formData.phoneNumber },
+                    { Name: 'given_name', Value: formData.givenName },
+                    { Name: 'family_name', Value: formData.familyName }
+                ];
+
+                await updateUserProfile(attributeList);
+
+                // Refresh after successful update
+                setTimeout(() => {
+                    refreshUserAttributes();
+                }, 1000);
+
+                setEditMessage({
+                    type: 'success',
+                    text: 'Profile updated successfully!'
+                });
+
+                setIsEditing(false);
+                return;
+            }
+
+            // Non-SSO user flow - use direct Cognito SDK update
             // Create attribute list for update
             const attributeList: CognitoUserAttribute[] = [];
 
-            // Always include custom attributes - these should work for all users
+            // Include all attributes
+            const fullName = `${formData.givenName} ${formData.familyName}`.trim();
             attributeList.push(
+                new CognitoUserAttribute({ Name: 'name', Value: fullName }),
+                new CognitoUserAttribute({ Name: 'given_name', Value: formData.givenName }),
+                new CognitoUserAttribute({ Name: 'family_name', Value: formData.familyName }),
                 new CognitoUserAttribute({ Name: 'custom:user_address', Value: formData.address }),
                 new CognitoUserAttribute({ Name: 'custom:birthdate', Value: formData.birthdate }),
                 new CognitoUserAttribute({ Name: 'custom:user_phone', Value: formData.phoneNumber })
             );
 
-            // Only include standard attributes for non-SSO users
-            if (!isCurrentUserSso) {
-                const fullName = `${formData.givenName} ${formData.familyName}`.trim();
-                attributeList.push(
-                    new CognitoUserAttribute({ Name: 'name', Value: fullName }),
-                    new CognitoUserAttribute({ Name: 'given_name', Value: formData.givenName }),
-                    new CognitoUserAttribute({ Name: 'family_name', Value: formData.familyName })
-                );
-            }
-
-            // Use the direct SDK approach for all users
+            // Continue with direct update for non-SSO users...
             await new Promise<void>((resolve, reject) => {
                 user.getSession((sessionErr: Error | null) => {
                     if (sessionErr) {
@@ -266,13 +302,24 @@ const MainPage = () => {
 
     const handleCancel = () => {
         // Reset form data to current values from Cognito attributes
-        setFormData({
-            givenName: cognitoAttributes.given_name || '',
-            familyName: cognitoAttributes.family_name || '',
-            address: cognitoAttributes['custom:user_address'] || '',
-            birthdate: cognitoAttributes['custom:birthdate'] || '',
-            phoneNumber: cognitoAttributes['custom:user_phone'] || ''
-        });
+        if (cognitoAttributes) {
+            setFormData({
+                givenName: cognitoAttributes.given_name || '',
+                familyName: cognitoAttributes.family_name || '',
+                address: cognitoAttributes['custom:user_address'] || '',
+                birthdate: cognitoAttributes['custom:birthdate'] || '',
+                phoneNumber: cognitoAttributes['custom:user_phone'] || ''
+            });
+        } else {
+            // Reset to empty if no attributes
+            setFormData({
+                givenName: '',
+                familyName: '',
+                address: '',
+                birthdate: '',
+                phoneNumber: ''
+            });
+        }
         setIsEditing(false);
         setEditMessage(null);
     };
