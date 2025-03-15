@@ -16,6 +16,19 @@ const Login: React.FC = () => {
     const location = useLocation();
     const processedCodes = useRef(new Set());
 
+    useEffect(() => {
+        // Add at the start of your component
+        console.log("Login component mounted, URL:", window.location.href);
+        console.log("URL parameters:", new URLSearchParams(window.location.search).toString());
+
+        // Add error handler to catch silent failures
+        const handleError = (event: ErrorEvent) => {
+            console.error("Global error caught:", event.error);
+        };
+        window.addEventListener('error', handleError);
+        return () => window.removeEventListener('error', handleError);
+    }, []);
+
     // Add this helper function at the top of your component
     const clearPreviousLoginData = () => {
         // Clear all auth tokens
