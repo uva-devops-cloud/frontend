@@ -15,8 +15,7 @@ const Login: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const processedCodes = useRef(new Set());
-
-    // Add this helper function at the top of your component
+    //important for avoiding mismatch
     const clearPreviousLoginData = () => {
         // Clear all auth tokens
         localStorage.removeItem('accessToken');
@@ -55,14 +54,14 @@ const Login: React.FC = () => {
                 codeLength: code?.length || 0
             });
 
-            // Add timestamp to prevent caching issues
+            // Timestamp to avoid caching issues
             const tokenRequest = new URLSearchParams();
             tokenRequest.append('grant_type', 'authorization_code');
             tokenRequest.append('client_id', clientId);
             tokenRequest.append('code', code);
             tokenRequest.append('redirect_uri', redirectUri);
 
-            // Add cache busting and improved error handling
+            // Improved error handling
             const response = await fetch(`https://${cognitoDomain}/oauth2/token?_=${Date.now()}`, {
                 method: 'POST',
                 headers: {
@@ -91,7 +90,7 @@ const Login: React.FC = () => {
         }
     };
 
-    // Extract user profile information from ID token
+    // Extract user profile data from ID token (will use for display)
     const parseJwt = (token: string): any => {
         try {
             // Split the token and get the payload part
@@ -113,7 +112,7 @@ const Login: React.FC = () => {
         }
     };
 
-    // Handle OAuth callback
+    // Handle google callback
     useEffect(() => {
         const handleOAuthCallback = async () => {
             const params = new URLSearchParams(location.search);
@@ -122,7 +121,7 @@ const Login: React.FC = () => {
 
             if (!code && !idToken) return;
 
-            // Check if we've already processed this code
+            // if code already processed
             if (code && processedCodes.current.has(code)) {
                 console.log('Auth code already processed, skipping');
                 return;
@@ -132,7 +131,7 @@ const Login: React.FC = () => {
 
             try {
                 if (code) {
-                    // Mark this code as processed immediately
+                    // Mark code as processed immediately
                     processedCodes.current.add(code);
 
                     console.log('OAuth code received, exchanging for tokens...');
@@ -141,7 +140,7 @@ const Login: React.FC = () => {
                     // Clear any previous login data before setting new data
                     clearPreviousLoginData();
 
-                    // Store tokens
+                    // Store tokens locally
                     localStorage.setItem('accessToken', tokenData.access_token);
                     localStorage.setItem('refreshToken', tokenData.refresh_token);
                     localStorage.setItem('idToken', tokenData.id_token);
@@ -163,8 +162,7 @@ const Login: React.FC = () => {
 
                     // We need to manually set up the Cognito user from tokens for SSO
                     const idTokenPayload = parseJwt(tokenData.id_token);
-
-                    // Store tokens in the exact format Cognito SDK expects
+                    // Cognito token format
                     const keyPrefix = `CognitoIdentityServiceProvider.${import.meta.env.VITE_COGNITO_CLIENT_ID}`;
                     const userKey = `${keyPrefix}.${idTokenPayload.email}`;
 
@@ -172,23 +170,15 @@ const Login: React.FC = () => {
                     localStorage.setItem(`${userKey}.accessToken`, tokenData.access_token);
                     localStorage.setItem(`${userKey}.refreshToken`, tokenData.refresh_token);
                     localStorage.setItem(`${keyPrefix}.LastAuthUser`, idTokenPayload.email);
-
-                    // Simply navigate to dashboard without profile check
                     navigate('/dashboard');
 
                     return;
                 }
 
-                // Implicit flow handling
                 else if (idToken) {
-                    // Handle implicit flow logic...
-                    // ...
-
-                    // After handling implicit flow, direct to dashboard
                     navigate('/dashboard');
                 }
             } catch (error) {
-                // Error handling...
                 console.error('OAuth authentication failed:', error);
                 alert('Authentication failed. Please try again.');
             } finally {
@@ -213,7 +203,6 @@ const Login: React.FC = () => {
         user.authenticateUser(authDetails, {
             onSuccess: (result) => {
                 console.log('Login successful!', result);
-                // Navigate immediately after successful login
                 navigate('/dashboard');
             },
             onFailure: (err) => {
@@ -229,14 +218,12 @@ const Login: React.FC = () => {
     const handleGoogleSignIn = () => {
         console.log('Using Cognito domain:', import.meta.env.VITE_COGNITO_DOMAIN); // Debug output
 
-        // Get just the domain prefix from env variables
         const domainPrefix = import.meta.env.VITE_COGNITO_DOMAIN;
-        // Form the complete Cognito domain URL
         const cognitoDomain = `${domainPrefix}.auth.eu-west-2.amazoncognito.com`;
         const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
         const redirectUri = window.location.origin + '/login';
 
-        // Build the authorization URL with Google as the identity provider
+        // Build authorization URL with Google 
         const authorizationUrl = `https://${cognitoDomain}/oauth2/authorize?` +
             `identity_provider=Google` +
             `&redirect_uri=${encodeURIComponent(redirectUri)}` +
@@ -244,7 +231,7 @@ const Login: React.FC = () => {
             `&client_id=${clientId}` +
             `&scope=${encodeURIComponent('openid email profile')}`;
 
-        console.log('Redirecting to:', authorizationUrl); // Debug the full URL
+        console.log('Redirecting to:', authorizationUrl); // Debugging 
         window.location.href = authorizationUrl;
     };
 
@@ -259,7 +246,6 @@ const Login: React.FC = () => {
                     </div>
                     <div className="inputs" style={{ textAlign: 'center', marginTop: '30px' }}>
                         <p>Please wait while we complete your authentication</p>
-                        {/* You could add a spinner here */}
                     </div>
                 </div>
             </div>
@@ -282,6 +268,11 @@ const Login: React.FC = () => {
                         <img src={password_icon} alt="" />
                         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" />
                     </div>
+
+                    <div className="forgot-password">
+                        Forgot password? <span onClick={() => navigate('/password-reset')}>Click here</span>
+                    </div>
+
                     <div className="submit-container">
                         <div className="submit" onClick={() => { signIn(email, password) }}>Sign In</div>
                         <div className="submit gray" onClick={() => navigate('/SignUp')}>Sign Up</div>
