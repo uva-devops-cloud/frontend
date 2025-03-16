@@ -9,8 +9,9 @@ const MainPage = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [editMessage, setEditMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+    const [isSSOUser, setIsSSOUser] = useState(false);
 
-    // Form state for editable fields - changed to have separate givenName and familyName
+    // Form state for editable fields
     const [formData, setFormData] = useState({
         givenName: '',
         familyName: '',
@@ -19,56 +20,200 @@ const MainPage = () => {
         phoneNumber: ''
     });
 
-    // Function to refresh user attributes from Cognito
-    const refreshUserAttributes = () => {
-        const user = UserPool.getCurrentUser();
-        if (!user) return;
+    // Check for SSO user by inspecting token or local storage
+    const checkIfSSOUser = () => {
+        // Method 1: Check localStorage for clues
+        const localStorageKeys = Object.keys(localStorage);
+        const hasIdentitiesToken = localStorageKeys.some(key =>
+            key.includes('CognitoIdentityServiceProvider') &&
+            key.includes('accessToken'));
 
-        user.getSession((err: Error | null) => {
-            if (err) return;
+        if (hasIdentitiesToken) {
+            // Find the actual token to parse
+            const tokenKey = localStorageKeys.find(key =>
+                key.includes('CognitoIdentityServiceProvider') &&
+                key.includes('idToken'));
 
-            user.getUserAttributes((attrErr, attributes) => {
-                if (!attrErr && attributes) {
-                    const userAttributes: Record<string, string> = {};
-                    attributes.forEach(attr => {
-                        userAttributes[attr.getName()] = attr.getValue();
-                    });
-                    setAttributes(userAttributes);
+            if (tokenKey) {
+                try {
+                    const token = localStorage.getItem(tokenKey);
+                    if (token) {
+                        // Decode token payload
+                        const payload = JSON.parse(atob(token.split('.')[1]));
+                        console.log('Token payload:', payload);
 
-                    // Initialize form data with current values - now split into givenName and familyName
-                    setFormData({
-                        givenName: userAttributes.given_name || '',
-                        familyName: userAttributes.family_name || '',
-                        address: userAttributes['custom:user_address'] || '',
-                        birthdate: userAttributes['custom:birthdate'] || '',
-                        phoneNumber: userAttributes['custom:user_phone'] || ''
-                    });
+                        // Check for SSO signs in the token
+                        if (payload.identities ||
+                            (payload.username && payload.username.includes('Google_')) ||
+                            (payload['cognito:groups'] && payload['cognito:groups'].includes('Google'))) {
+                            console.log('✓ SSO user detected from token!');
+                            return true;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error parsing token:', error);
                 }
+            }
+        }
+
+        // Method 2: Check the last auth user
+        const lastAuthUserKey = localStorageKeys.find(key =>
+            key.includes('CognitoIdentityServiceProvider') &&
+            key.includes('LastAuthUser'));
+
+        if (lastAuthUserKey) {
+            const lastAuthUser = localStorage.getItem(lastAuthUserKey);
+            if (lastAuthUser && lastAuthUser.startsWith('Google_')) {
+                console.log('✓ SSO user detected from LastAuthUser!');
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    // Modified function to handle regular and SSO users differently
+    const refreshUserAttributes = async () => {
+        // First, check if this is an SSO user
+        const isSSO = checkIfSSOUser();
+        setIsSSOUser(isSSO);
+
+        if (isSSO) {
+            console.log('SSO user detected, using alternative attribute retrieval');
+            // For SSO users, try to extract basic info from tokens instead
+            try {
+                // Find token in localStorage
+                const tokenKey = Object.keys(localStorage).find(key =>
+                    key.includes('CognitoIdentityServiceProvider') &&
+                    key.includes('idToken'));
+
+                if (tokenKey) {
+                    const token = localStorage.getItem(tokenKey);
+                    if (token) {
+                        // Decode token payload
+                        const payload = JSON.parse(atob(token.split('.')[1]));
+
+                        // Create attributes object from token claims
+                        const userAttributes = {
+                            'email': payload.email || '',
+                            'name': payload.name || '',
+                            'given_name': payload.given_name || '',
+                            'family_name': payload.family_name || '',
+                            'sub': payload.sub || ''
+                        };
+
+                        setAttributes(userAttributes);
+
+                        // Initialize form data with current values
+                        setFormData({
+                            givenName: userAttributes.given_name || '',
+                            familyName: userAttributes.family_name || '',
+                            address: '',  // SSO doesn't provide these
+                            birthdate: '',
+                            phoneNumber: ''
+                        });
+
+                        setIsLoading(false);
+                        return;
+                    }
+                }
+
+                // Fallback to minimal attributes if token parsing fails
+                setAttributes({
+                    'email': 'Your Google Account',
+                    'name': 'Google SSO User',
+                });
+
+                setIsLoading(false);
+
+            } catch (error) {
+                console.error('Error retrieving SSO user attributes:', error);
+                setIsLoading(false);
+            }
+            return;
+        }
+
+        // For regular Cognito users, use the standard approach
+        const user = UserPool.getCurrentUser();
+        if (!user) {
+            console.log('No current user found');
+            setIsLoading(false);
+            return;
+        }
+
+        try {
+            // Use a Promise-based approach for better async handling
+            await new Promise((resolve, reject) => {
+                user.getSession((err: Error | null, session: any) => {
+                    if (err) reject(err);
+                    else resolve(session);
+                });
             });
-        });
+
+            const attributes: any[] = await new Promise((resolve, reject) => {
+                user.getUserAttributes((err, attributes) => {
+                    if (err) reject(err);
+                    else resolve(attributes || []);
+                });
+            });
+
+            // Convert attributes to a more usable format
+            const userAttributes: Record<string, string> = {};
+            attributes.forEach((attr: any) => {
+                userAttributes[attr.getName()] = attr.getValue();
+            });
+
+            console.log('User attributes loaded:', userAttributes);
+
+            setAttributes(userAttributes);
+
+            // Initialize form data with current values
+            setFormData({
+                givenName: userAttributes.given_name || '',
+                familyName: userAttributes.family_name || '',
+                address: userAttributes['custom:user_address'] || '',
+                birthdate: userAttributes['custom:birthdate'] || '',
+                phoneNumber: userAttributes['custom:user_phone'] || ''
+            });
+
+            setIsLoading(false);
+
+        } catch (error) {
+            console.error('Error refreshing user attributes:', error);
+            setIsLoading(false);
+        }
     };
 
     useEffect(() => {
         const loadData = async () => {
             setIsLoading(true);
             try {
-                try {
-                    const session = await getCurrentSession();
-                    if (session.isValid()) {
-                        refreshUserAttributes();
-                    }
-                } catch (error) {
-                    console.error('Error fetching Cognito attributes:', error);
+                // First check if we have a valid session
+                const session = await getCurrentSession();
+                if (session.isValid()) {
+                    console.log('Valid session found, user authenticated');
+                    // Then load the user attributes
+                    await refreshUserAttributes();
+                } else {
+                    console.log('Invalid session found');
+                    setIsLoading(false);
                 }
             } catch (error) {
-                console.error('Error fetching data:', error);
-            } finally {
+                console.error('Error loading user data:', error);
                 setIsLoading(false);
             }
         };
 
         loadData();
     }, []);
+
+    // Added useEffect to log when isSSOUser changes
+    useEffect(() => {
+        console.log('Rendering MainPage, isEditing:', isEditing);
+        if (isSSOUser) {
+            console.log('SSO user detected - edit button should be disabled');
+        }
+    }, [isEditing, isSSOUser]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -78,10 +223,26 @@ const MainPage = () => {
         });
     };
 
+    // Modify the handleSave function to use API for SSO users
     const handleSave = () => {
         setIsSaving(true);
         setEditMessage(null);
 
+        if (isSSOUser) {
+            console.log('SSO user detected, using API update method directly');
+            // Code for API update will go here
+
+            // For now, just show an error
+            setEditMessage({
+                type: 'error',
+                text: 'Profile updates for SSO users are not yet available. We\'re working on it!'
+            });
+            setIsSaving(false);
+            setIsEditing(false);
+            return;
+        }
+
+        // Existing code for regular Cognito users...
         const user = UserPool.getCurrentUser();
         if (!user) {
             setEditMessage({
@@ -172,12 +333,24 @@ const MainPage = () => {
                         <div className="card-header d-flex justify-content-between align-items-center">
                             <h5>Student Information</h5>
                             {!isEditing ? (
-                                <button
-                                    className="btn btn-outline-primary btn-sm"
-                                    onClick={() => setIsEditing(true)}
-                                >
-                                    Edit
-                                </button>
+                                <>
+                                    {isSSOUser ? (
+                                        <button
+                                            className="btn btn-outline-secondary btn-sm"
+                                            disabled
+                                            title="Profile editing is not available for SSO users at this time"
+                                        >
+                                            Edit Unavailable
+                                        </button>
+                                    ) : (
+                                        <button
+                                            className="btn btn-outline-primary btn-sm"
+                                            onClick={() => setIsEditing(true)}
+                                        >
+                                            Edit
+                                        </button>
+                                    )}
+                                </>
                             ) : (
                                 <div>
                                     <button
@@ -201,6 +374,17 @@ const MainPage = () => {
                             {editMessage && (
                                 <div className={`alert alert-${editMessage.type === 'success' ? 'success' : 'danger'} mb-3`}>
                                     {editMessage.text}
+                                </div>
+                            )}
+
+                            {/* This message will ALWAYS show for SSO users regardless of edit state */}
+                            {isSSOUser && (
+                                <div className="alert alert-warning mb-3">
+                                    <i className="bi bi-exclamation-triangle me-2"></i>
+                                    <strong>Google SSO Account</strong>
+                                    <p className="mb-0">Student profile editing is not available for Google accounts.
+                                        You can still use the AI Chatbot and other features of the platform.
+                                        Profile editing for SSO users will be available in a future update.</p>
                                 </div>
                             )}
 
