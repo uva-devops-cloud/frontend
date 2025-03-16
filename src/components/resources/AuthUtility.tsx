@@ -61,7 +61,6 @@ export const getAuthHeaders = async (): Promise<HeadersInit> => {
 
 // Complete logout function that cleans up Cognito session
 export const logOut = (): void => {
-    // Sign out from Cognito if there's a user session
     const user = UserPool.getCurrentUser();
     if (user) {
         user.signOut();

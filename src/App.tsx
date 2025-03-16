@@ -1,5 +1,6 @@
 import Signup from "./components/LoginSignup/Signup";
 import Login from "./components/LoginSignup/Login";
+import PasswordReset from "./components/LoginSignup/PasswordReset";
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import ApiInteractions from "./components/API/ApiInteractions";
 import MainPage from "./components/Pages/MainPage";
@@ -14,6 +15,7 @@ function App() {
         <Route path="/" element={<Navigate to="/login" />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/password-reset" element={<PasswordReset />} />
         <Route path="/ApiInteractions" element={<ApiInteractions />} />
 
         {/* Protected routes with JWT token with shared layout */}

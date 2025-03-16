@@ -74,7 +74,7 @@
 
 .forgot-password {
     padding-left: 62px;
-    margin-top: 27px;
+    margin-top: 2px;
     color: #797979;
     font-size: 18px;
 }
@@ -200,4 +200,13 @@
     color: #757575;
     font-size: 16px;
     font-weight: 500;
+}
+
+.reset-message {
+    width: 480px;
+    margin: 10px auto;
+    padding: 10px;
+    text-align: center;
+    color: #4c00b4;
+    font-size: 16px;
 }

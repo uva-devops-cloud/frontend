@@ -72,15 +72,15 @@ const MainPage = () => {
         return false;
     };
 
-    // Modified function to handle regular and SSO users differently
+    // Different handling of SSO and normal users
     const refreshUserAttributes = async () => {
-        // First, check if this is an SSO user
+        // Check if SSO user
         const isSSO = checkIfSSOUser();
         setIsSSOUser(isSSO);
 
         if (isSSO) {
             console.log('SSO user detected, using alternative attribute retrieval');
-            // For SSO users, try to extract basic info from tokens instead
+            // For SSO users, try to extract basic info from tokens instead (usable for display)
             try {
                 // Find token in localStorage
                 const tokenKey = Object.keys(localStorage).find(key =>
@@ -90,10 +90,10 @@ const MainPage = () => {
                 if (tokenKey) {
                     const token = localStorage.getItem(tokenKey);
                     if (token) {
-                        // Decode token payload
+                        // Decode token
                         const payload = JSON.parse(atob(token.split('.')[1]));
 
-                        // Create attributes object from token claims
+                        // Create attributes object from token
                         const userAttributes = {
                             'email': payload.email || '',
                             'name': payload.name || '',
@@ -207,7 +207,7 @@ const MainPage = () => {
         loadData();
     }, []);
 
-    // Added useEffect to log when isSSOUser changes
+    // Debuggning log when isSSOUser changes
     useEffect(() => {
         console.log('Rendering MainPage, isEditing:', isEditing);
         if (isSSOUser) {
@@ -223,16 +223,12 @@ const MainPage = () => {
         });
     };
 
-    // Modify the handleSave function to use API for SSO users
     const handleSave = () => {
         setIsSaving(true);
         setEditMessage(null);
 
         if (isSSOUser) {
-            console.log('SSO user detected, using API update method directly');
-            // Code for API update will go here
-
-            // For now, just show an error
+            console.log('SSO user detected');
             setEditMessage({
                 type: 'error',
                 text: 'Profile updates for SSO users are not yet available. We\'re working on it!'
@@ -242,7 +238,6 @@ const MainPage = () => {
             return;
         }
 
-        // Existing code for regular Cognito users...
         const user = UserPool.getCurrentUser();
         if (!user) {
             setEditMessage({
@@ -309,7 +304,7 @@ const MainPage = () => {
     };
 
     const handleCancel = () => {
-        // Reset form data to current values from Cognito attributes
+        // Reset form data to current values
         setFormData({
             givenName: cognitoAttributes.given_name || '',
             familyName: cognitoAttributes.family_name || '',
@@ -382,7 +377,7 @@ const MainPage = () => {
                                 <div className="alert alert-warning mb-3">
                                     <i className="bi bi-exclamation-triangle me-2"></i>
                                     <strong>Google SSO Account</strong>
-                                    <p className="mb-0">Student profile editing is not available for Google accounts.
+                                    <p className="mb-0">Student profile editing on this platform is not available for Google accounts.
                                         You can still use the AI Chatbot and other features of the platform.
                                         Profile editing for SSO users will be available in a future update.</p>
                                 </div>
@@ -462,7 +457,6 @@ const MainPage = () => {
                                             </div>
                                         </>
                                     ) : (
-                                        // View mode - display directly from cognitoAttributes
                                         <>
                                             <p><strong>Name:</strong> {cognitoAttributes.name || `${cognitoAttributes.given_name || ''} ${cognitoAttributes.family_name || ''}`}</p>
                                             <p><strong>Email:</strong> {cognitoAttributes.email}</p>
@@ -484,8 +478,6 @@ const MainPage = () => {
                     </div>
                 </div>
             </div>
-
-            {/* Welcome message */}
             <div className="row mt-4">
                 <div className="col-12">
                     <div className="card">
