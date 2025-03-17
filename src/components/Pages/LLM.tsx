@@ -89,6 +89,22 @@ const ChatInterface: React.FC = () => {
             return;
           }
           console.log("Session obtained:", session);
+          
+          // For debugging - log all available token types
+          try {
+            console.log("ID Token:", session.getIdToken().getJwtToken().substring(0, 20) + "...");
+            console.log("Access Token:", session.getAccessToken().getJwtToken().substring(0, 20) + "...");
+            console.log("Refresh Token:", session.getRefreshToken().getToken().substring(0, 20) + "...");
+            
+            // Log token payload for debugging scopes
+            const payload = session.getAccessToken().decodePayload();
+            console.log("Access Token scopes:", payload.scope);
+            console.log("Access Token client_id:", payload.client_id);
+          } catch (e) {
+            console.error("Error accessing token details:", e);
+          }
+          
+          // Use the access token for API calls
           const jwtToken = session.getAccessToken().getJwtToken();
           console.log("Auth token being used:", jwtToken.substring(0, 20) + "...");
           resolve(jwtToken);
@@ -187,6 +203,22 @@ const ChatInterface: React.FC = () => {
             return;
           }
           console.log("Session obtained:", session);
+          
+          // For debugging - log all available token types
+          try {
+            console.log("ID Token:", session.getIdToken().getJwtToken().substring(0, 20) + "...");
+            console.log("Access Token:", session.getAccessToken().getJwtToken().substring(0, 20) + "...");
+            console.log("Refresh Token:", session.getRefreshToken().getToken().substring(0, 20) + "...");
+            
+            // Log token payload for debugging scopes
+            const payload = session.getAccessToken().decodePayload();
+            console.log("Access Token scopes:", payload.scope);
+            console.log("Access Token client_id:", payload.client_id);
+          } catch (e) {
+            console.error("Error accessing token details:", e);
+          }
+          
+          // Use the access token for API calls
           const jwtToken = session.getAccessToken().getJwtToken();
           console.log("Auth token being used:", jwtToken.substring(0, 20) + "...");
           resolve(jwtToken);
