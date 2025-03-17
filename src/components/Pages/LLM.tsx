@@ -53,44 +53,63 @@ const ChatInterface: React.FC = () => {
     e.preventDefault();
     if (!input.trim()) return;
 
-    // Append the user's message
-    const userMessage: Message = { 
-      text: input, 
-      sender: "user",
-      timestamp: new Date()
-    };
-    setMessages((prev) => [...prev, userMessage]);
-    setIsLoading(true);
-
     try {
-      // Get token directly from Cognito
+      setIsLoading(true);
+      const userMessage: Message = { 
+        text: input, 
+        sender: "user",
+        timestamp: new Date()
+      };
+      setMessages((prev) => [...prev, userMessage]);
+      setInput("");
+
+      // Get the API URL from environment variable or use default
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://3q336xufi6.execute-api.eu-west-2.amazonaws.com/dev';
+      console.log("Using API URL:", apiUrl);
+
+      // Get user from Cognito User Pool
       const user = UserPool.getCurrentUser();
       if (!user) {
         throw new Error("No authenticated user found");
       }
       
+      console.log("Current user:", user);
+      
       // Get session token directly
       const token = await new Promise((resolve, reject) => {
         user.getSession((err: Error | null, session: any) => {
           if (err) {
+            console.error("Session error:", err);
             reject(err);
             return;
           }
           if (!session) {
+            console.error("No session found");
             reject(new Error("No session found"));
             return;
           }
+          console.log("Session obtained:", session);
           const jwtToken = session.getAccessToken().getJwtToken();
+          console.log("Auth token being used:", jwtToken.substring(0, 20) + "...");
           resolve(jwtToken);
         });
       });
 
+      // Try with different auth header formats to debug
+      const authHeaders = {
+        // Standard format
+        "Authorization": `Bearer ${token}`,
+      };
+      
+      console.log("Making API request to:", `${apiUrl}/query`);
+      console.log("Using headers:", JSON.stringify(authHeaders));
+      
       // Fetch response from the API endpoint with Authorization header
       const response = await fetch(`${apiUrl}/query`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          ...authHeaders
         },
         body: JSON.stringify({
           message: input
@@ -98,16 +117,23 @@ const ChatInterface: React.FC = () => {
       });
 
       if (!response.ok) {
+        console.error("API response not OK:", response.status, response.statusText);
+        // Try to get the error body
+        try {
+          const errorBody = await response.text();
+          console.error("Error response body:", errorBody);
+        } catch (e) {
+          console.error("Failed to read error body");
+        }
         throw new Error(`API request failed with status ${response.status}`);
       }
 
       const data: QueryResponse = await response.json();
-      
-      // Store the correlationId for status polling
-      setCorrelationId(data.correlationId);
-      
-      // If we have a direct answer (no worker lambdas needed)
-      if (data.status === "complete" && data.answer) {
+      console.log("API response:", data);
+
+      // Handle the API response
+      if (data.status === 'complete' && data.answer) {
+        // If we got a direct answer, display it immediately
         addBotMessage(data.answer);
         setIsLoading(false);
         setCorrelationId(null);
@@ -116,11 +142,12 @@ const ChatInterface: React.FC = () => {
           clearInterval(pollingInterval);
           setPollingInterval(null);
         }
+      } else if (data.correlationId) {
+        // Store the correlationId for status polling
+        setCorrelationId(data.correlationId);
+      } else {
+        throw new Error("Invalid response from API");
       }
-      
-      // Clear input field
-      setInput("");
-      
     } catch (error) {
       console.error("Error fetching from API:", error);
       // Show error message
@@ -130,6 +157,8 @@ const ChatInterface: React.FC = () => {
         timestamp: new Date()
       };
       setMessages((prev) => [...prev, errorMessage]);
+      setIsLoading(false);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -142,22 +171,29 @@ const ChatInterface: React.FC = () => {
         throw new Error("No authenticated user found");
       }
       
+      console.log("Current user:", user);
+      
       // Get session token directly
       const token = await new Promise((resolve, reject) => {
         user.getSession((err: Error | null, session: any) => {
           if (err) {
+            console.error("Session error:", err);
             reject(err);
             return;
           }
           if (!session) {
+            console.error("No session found");
             reject(new Error("No session found"));
             return;
           }
+          console.log("Session obtained:", session);
           const jwtToken = session.getAccessToken().getJwtToken();
+          console.log("Auth token being used:", jwtToken.substring(0, 20) + "...");
           resolve(jwtToken);
         });
       });
-      
+
+      console.log("Making API request to:", `${apiUrl}/query/${id}`);
       // Check status endpoint
       const response = await fetch(`${apiUrl}/query/${id}`, {
         method: "GET",
