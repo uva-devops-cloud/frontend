@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { getAuthHeaders } from "../resources/AuthUtility"; // Change back to getAuthHeaders which now has better error handling
+import UserPool from "../resources/Cognito"; // Import UserPool directly
 
 interface Message {
   text: string;
@@ -63,15 +63,34 @@ const ChatInterface: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Use the improved getAuthHeaders method that handles localStorage restrictions
-      const headers = await getAuthHeaders();
+      // Get token directly from Cognito
+      const user = UserPool.getCurrentUser();
+      if (!user) {
+        throw new Error("No authenticated user found");
+      }
+      
+      // Get session token directly
+      const token = await new Promise((resolve, reject) => {
+        user.getSession((err: Error | null, session: any) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          if (!session) {
+            reject(new Error("No session found"));
+            return;
+          }
+          const jwtToken = session.getAccessToken().getJwtToken();
+          resolve(jwtToken);
+        });
+      });
 
       // Fetch response from the API endpoint with Authorization header
       const response = await fetch(`${apiUrl}/query`, {
         method: "POST",
         headers: {
-          ...headers,
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
           message: input
@@ -117,13 +136,35 @@ const ChatInterface: React.FC = () => {
   
   const checkQueryStatus = async (id: string) => {
     try {
-      // Use the improved getAuthHeaders method that handles localStorage restrictions
-      const headers = await getAuthHeaders();
+      // Get token directly from Cognito
+      const user = UserPool.getCurrentUser();
+      if (!user) {
+        throw new Error("No authenticated user found");
+      }
+      
+      // Get session token directly
+      const token = await new Promise((resolve, reject) => {
+        user.getSession((err: Error | null, session: any) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          if (!session) {
+            reject(new Error("No session found"));
+            return;
+          }
+          const jwtToken = session.getAccessToken().getJwtToken();
+          resolve(jwtToken);
+        });
+      });
       
       // Check status endpoint
       const response = await fetch(`${apiUrl}/query/${id}`, {
         method: "GET",
-        headers: headers,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
       });
       
       if (!response.ok) {
