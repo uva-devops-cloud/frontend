@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { getAuthHeaders } from "../resources/AuthUtility"; // Import your auth utility
+import { getAuthToken } from "../resources/AuthUtility"; // Change to getAuthToken instead of getAuthHeaders
 
 interface Message {
   text: string;
@@ -63,15 +63,19 @@ const ChatInterface: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Get authentication headers with valid JWT token
-      const headers = await getAuthHeaders();
+      // Get the JWT token directly instead of using getAuthHeaders
+      const token = getAuthToken();
+
+      if (!token) {
+        throw new Error("Authentication token not found");
+      }
 
       // Fetch response from the API endpoint with Authorization header
       const response = await fetch(`${apiUrl}/query`, {
         method: "POST",
         headers: {
-          ...headers,
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
           message: input
@@ -117,13 +121,20 @@ const ChatInterface: React.FC = () => {
   
   const checkQueryStatus = async (id: string) => {
     try {
-      // Get authentication headers with valid JWT token
-      const headers = await getAuthHeaders();
+      // Get the JWT token directly
+      const token = getAuthToken();
+      
+      if (!token) {
+        throw new Error("Authentication token not found");
+      }
       
       // Check status endpoint
       const response = await fetch(`${apiUrl}/query/${id}`, {
         method: "GET",
-        headers: headers,
+        headers: {
+          "Content-Type": "application/json", 
+          "Authorization": `Bearer ${token}`
+        },
       });
       
       if (!response.ok) {
