@@ -47,7 +47,19 @@ const Signup: React.FC = () => {
         UserPool.signUp(email, password, attributeList, [], (err, result) => {
             if (err) {
                 console.error(err);
-                alert(err.message);
+
+                // Check if this is a "user already exists" error
+                if (err.name === 'UsernameExistsException' ||
+                    err.message.includes('already exists') ||
+                    err.message.includes('User account already exists')) {
+
+                    if (confirm('This email is already registered. Would you like to go to the login page?')) {
+                        navigate('/Login');
+                    }
+                } else {
+                    // For other errors, just show the message
+                    alert(err.message);
+                }
             } else {
                 console.log("Sign Up successful:", result);
                 setStep(2);  // Only change steps if signup was successful
