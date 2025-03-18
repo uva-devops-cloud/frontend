@@ -8,9 +8,10 @@ interface Message {
 }
 
 interface QueryResponse {
-  correlationId: string;
-  message: string;
-  status: string;
+  correlationId?: string;
+  message?: string;
+  requiresWorkers?: boolean;
+  status: string; // You can extend this union as needed
   answer?: string;
 }
 
@@ -19,8 +20,10 @@ const ChatInterface: React.FC = () => {
   const [input, setInput] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [correlationId, setCorrelationId] = useState<string | null>(null);
-  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
-  
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(
+    null,
+  );
+
   const apiUrl =
     import.meta.env.VITE_API_URL ||
     "https://3q336xufi6.execute-api.eu-west-2.amazonaws.com/dev";
@@ -40,9 +43,9 @@ const ChatInterface: React.FC = () => {
       const interval = setInterval(() => {
         checkQueryStatus(correlationId);
       }, 2000); // Poll every 2 seconds
-      
+
       setPollingInterval(interval);
-      
+
       return () => {
         clearInterval(interval);
       };
@@ -55,16 +58,18 @@ const ChatInterface: React.FC = () => {
 
     try {
       setIsLoading(true);
-      const userMessage: Message = { 
-        text: input, 
+      const userMessage: Message = {
+        text: input,
         sender: "user",
-        timestamp: new Date()
+        timestamp: new Date(),
       };
       setMessages((prev) => [...prev, userMessage]);
       setInput("");
 
       // Get the API URL from environment variable or use default
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://3q336xufi6.execute-api.eu-west-2.amazonaws.com/dev';
+      const apiUrl =
+        import.meta.env.VITE_API_URL ||
+        "https://3q336xufi6.execute-api.eu-west-2.amazonaws.com/dev";
       console.log("Using API URL:", apiUrl);
 
       // Get user from Cognito User Pool
@@ -72,9 +77,9 @@ const ChatInterface: React.FC = () => {
       if (!user) {
         throw new Error("No authenticated user found");
       }
-      
+
       console.log("Current user:", user);
-      
+
       // Get session token directly
       const token = await new Promise((resolve, reject) => {
         user.getSession((err: Error | null, session: any) => {
@@ -89,13 +94,22 @@ const ChatInterface: React.FC = () => {
             return;
           }
           console.log("Session obtained:", session);
-          
+
           // For debugging - log all available token types
           try {
-            console.log("ID Token:", session.getIdToken().getJwtToken().substring(0, 20) + "...");
-            console.log("Access Token:", session.getAccessToken().getJwtToken().substring(0, 20) + "...");
-            console.log("Refresh Token:", session.getRefreshToken().getToken().substring(0, 20) + "...");
-            
+            console.log(
+              "ID Token:",
+              session.getIdToken().getJwtToken().substring(0, 20) + "...",
+            );
+            console.log(
+              "Access Token:",
+              session.getAccessToken().getJwtToken().substring(0, 20) + "...",
+            );
+            console.log(
+              "Refresh Token:",
+              session.getRefreshToken().getToken().substring(0, 20) + "...",
+            );
+
             // Log token payload for debugging scopes
             const payload = session.getAccessToken().decodePayload();
             console.log("Access Token scopes:", payload.scope);
@@ -103,10 +117,13 @@ const ChatInterface: React.FC = () => {
           } catch (e) {
             console.error("Error accessing token details:", e);
           }
-          
+
           // Use the access token for API calls
           const jwtToken = session.getAccessToken().getJwtToken();
-          console.log("Auth token being used:", jwtToken.substring(0, 20) + "...");
+          console.log(
+            "Auth token being used:",
+            jwtToken.substring(0, 20) + "...",
+          );
           resolve(jwtToken);
         });
       });
@@ -114,26 +131,30 @@ const ChatInterface: React.FC = () => {
       // Try with different auth header formats to debug
       const authHeaders = {
         // Standard format
-        "Authorization": `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       };
-      
+
       console.log("Making API request to:", `${apiUrl}/query`);
       console.log("Using headers:", JSON.stringify(authHeaders));
-      
+
       // Fetch response from the API endpoint with Authorization header
       const response = await fetch(`${apiUrl}/query`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...authHeaders
+          ...authHeaders,
         },
         body: JSON.stringify({
-          message: input
+          message: input,
         }),
       });
 
       if (!response.ok) {
-        console.error("API response not OK:", response.status, response.statusText);
+        console.error(
+          "API response not OK:",
+          response.status,
+          response.statusText,
+        );
         // Try to get the error body
         try {
           const errorBody = await response.text();
@@ -148,12 +169,12 @@ const ChatInterface: React.FC = () => {
       console.log("API response:", data);
 
       // Handle the API response
-      if (data.status === 'complete' && data.answer) {
-        // If we got a direct answer, display it immediately
-        addBotMessage(data.answer);
+      if (data.status === "success") {
+        const reply = data.answer || data.message || "";
+        addBotMessage(reply);
         setIsLoading(false);
         setCorrelationId(null);
-        
+
         if (pollingInterval) {
           clearInterval(pollingInterval);
           setPollingInterval(null);
@@ -170,7 +191,7 @@ const ChatInterface: React.FC = () => {
       const errorMessage: Message = {
         text: "Sorry, there was an error connecting to the service. Please try again.",
         sender: "bot",
-        timestamp: new Date()
+        timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
       setIsLoading(false);
@@ -178,7 +199,7 @@ const ChatInterface: React.FC = () => {
       setIsLoading(false);
     }
   };
-  
+
   const checkQueryStatus = async (id: string) => {
     try {
       // Get token directly from Cognito
@@ -186,9 +207,9 @@ const ChatInterface: React.FC = () => {
       if (!user) {
         throw new Error("No authenticated user found");
       }
-      
+
       console.log("Current user:", user);
-      
+
       // Get session token directly
       const token = await new Promise((resolve, reject) => {
         user.getSession((err: Error | null, session: any) => {
@@ -203,13 +224,22 @@ const ChatInterface: React.FC = () => {
             return;
           }
           console.log("Session obtained:", session);
-          
+
           // For debugging - log all available token types
           try {
-            console.log("ID Token:", session.getIdToken().getJwtToken().substring(0, 20) + "...");
-            console.log("Access Token:", session.getAccessToken().getJwtToken().substring(0, 20) + "...");
-            console.log("Refresh Token:", session.getRefreshToken().getToken().substring(0, 20) + "...");
-            
+            console.log(
+              "ID Token:",
+              session.getIdToken().getJwtToken().substring(0, 20) + "...",
+            );
+            console.log(
+              "Access Token:",
+              session.getAccessToken().getJwtToken().substring(0, 20) + "...",
+            );
+            console.log(
+              "Refresh Token:",
+              session.getRefreshToken().getToken().substring(0, 20) + "...",
+            );
+
             // Log token payload for debugging scopes
             const payload = session.getAccessToken().decodePayload();
             console.log("Access Token scopes:", payload.scope);
@@ -217,10 +247,13 @@ const ChatInterface: React.FC = () => {
           } catch (e) {
             console.error("Error accessing token details:", e);
           }
-          
+
           // Use the access token for API calls
           const jwtToken = session.getAccessToken().getJwtToken();
-          console.log("Auth token being used:", jwtToken.substring(0, 20) + "...");
+          console.log(
+            "Auth token being used:",
+            jwtToken.substring(0, 20) + "...",
+          );
           resolve(jwtToken);
         });
       });
@@ -231,21 +264,21 @@ const ChatInterface: React.FC = () => {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
       });
-      
+
       if (!response.ok) {
         throw new Error(`Status API error: ${response.status}`);
       }
-      
+
       const data: QueryResponse = await response.json();
-      
-      if (data.status === "complete" && data.answer) {
+
+      if (data.status === "success" && data.answer) {
         addBotMessage(data.answer);
         setIsLoading(false);
         setCorrelationId(null);
-        
+
         if (pollingInterval) {
           clearInterval(pollingInterval);
           setPollingInterval(null);
@@ -254,28 +287,27 @@ const ChatInterface: React.FC = () => {
         addBotMessage(`Error processing your request: ${data.message}`);
         setIsLoading(false);
         setCorrelationId(null);
-        
+
         if (pollingInterval) {
           clearInterval(pollingInterval);
           setPollingInterval(null);
         }
       }
       // If status is still "processing", we'll continue polling
-      
     } catch (err) {
       console.error("Error checking query status:", err);
       // Don't set error here, just log it and continue polling
     }
   };
-  
+
   const addBotMessage = (text: string) => {
     const botMessage: Message = {
       text,
       sender: "bot",
-      timestamp: new Date()
+      timestamp: new Date(),
     };
-    
-    setMessages(prev => [...prev, botMessage]);
+
+    setMessages((prev) => [...prev, botMessage]);
   };
 
   return (
@@ -294,7 +326,10 @@ const ChatInterface: React.FC = () => {
             {msg.text}
             {msg.timestamp && (
               <div style={styles.timestamp}>
-                {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {msg.timestamp.toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
               </div>
             )}
           </div>
