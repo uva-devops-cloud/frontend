@@ -11,8 +11,12 @@ interface QueryResponse {
   correlationId?: string;
   message?: string;
   requiresWorkers?: boolean;
-  status: string; // You can extend this union as needed
-  answer?: string;
+  status: "COMPLETED" | "ERROR" | "PROCESSING" | "PENDING";
+  response?: string;
+  error?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  query?: string;
 }
 
 const ChatInterface: React.FC = () => {
@@ -23,6 +27,8 @@ const ChatInterface: React.FC = () => {
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(
     null,
   );
+  const [pollingAttempts, setPollingAttempts] = useState<number>(0);
+  const MAX_POLLING_ATTEMPTS = 90; // ~3 minutes with 2-second intervals
 
   const apiUrl =
     import.meta.env.VITE_API_URL ||
@@ -40,6 +46,9 @@ const ChatInterface: React.FC = () => {
   // Poll for query status when we have a correlationId
   useEffect(() => {
     if (correlationId && isLoading) {
+      // Reset polling attempts when starting new polling session
+      setPollingAttempts(0);
+      
       const interval = setInterval(() => {
         checkQueryStatus(correlationId);
       }, 2000); // Poll every 2 seconds
@@ -169,19 +178,20 @@ const ChatInterface: React.FC = () => {
       console.log("API response:", data);
 
       // Handle the API response
-      if (data.status === "success") {
-        const reply = data.answer || data.message || "";
-        addBotMessage(reply);
+      if (data.status === "COMPLETED" && data.response) {
+        // Immediate success with answer
+        addBotMessage(data.response);
         setIsLoading(false);
         setCorrelationId(null);
-
-        if (pollingInterval) {
-          clearInterval(pollingInterval);
-          setPollingInterval(null);
-        }
       } else if (data.correlationId) {
         // Store the correlationId for status polling
+        console.log(`Starting polling with correlationId: ${data.correlationId}`);
         setCorrelationId(data.correlationId);
+        
+        // Add a "thinking" message if processing will take time
+        if (data.requiresWorkers) {
+          addBotMessage("Gathering information to answer your question...");
+        }
       } else {
         throw new Error("Invalid response from API");
       }
@@ -195,20 +205,40 @@ const ChatInterface: React.FC = () => {
       };
       setMessages((prev) => [...prev, errorMessage]);
       setIsLoading(false);
-    } finally {
-      setIsLoading(false);
+      
+      // Clean up any polling
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+        setPollingInterval(null);
+      }
+      setCorrelationId(null);
     }
   };
 
   const checkQueryStatus = async (id: string) => {
     try {
+      // Increment polling attempts
+      setPollingAttempts(prev => {
+        const newAttempts = prev + 1;
+        // Stop polling if we've reached max attempts
+        if (newAttempts >= MAX_POLLING_ATTEMPTS) {
+          addBotMessage("Sorry, it's taking longer than expected. Please try again.");
+          setIsLoading(false);
+          setCorrelationId(null);
+          if (pollingInterval) {
+            clearInterval(pollingInterval);
+            setPollingInterval(null);
+          }
+          return newAttempts;
+        }
+        return newAttempts;
+      });
+
       // Get token directly from Cognito
       const user = UserPool.getCurrentUser();
       if (!user) {
         throw new Error("No authenticated user found");
       }
-
-      console.log("Current user:", user);
 
       // Get session token directly
       const token = await new Promise((resolve, reject) => {
@@ -223,42 +253,15 @@ const ChatInterface: React.FC = () => {
             reject(new Error("No session found"));
             return;
           }
-          console.log("Session obtained:", session);
-
-          // For debugging - log all available token types
-          try {
-            console.log(
-              "ID Token:",
-              session.getIdToken().getJwtToken().substring(0, 20) + "...",
-            );
-            console.log(
-              "Access Token:",
-              session.getAccessToken().getJwtToken().substring(0, 20) + "...",
-            );
-            console.log(
-              "Refresh Token:",
-              session.getRefreshToken().getToken().substring(0, 20) + "...",
-            );
-
-            // Log token payload for debugging scopes
-            const payload = session.getAccessToken().decodePayload();
-            console.log("Access Token scopes:", payload.scope);
-            console.log("Access Token client_id:", payload.client_id);
-          } catch (e) {
-            console.error("Error accessing token details:", e);
-          }
 
           // Use the access token for API calls
           const jwtToken = session.getAccessToken().getJwtToken();
-          console.log(
-            "Auth token being used:",
-            jwtToken.substring(0, 20) + "...",
-          );
           resolve(jwtToken);
         });
       });
 
-      console.log("Making API request to:", `${apiUrl}/query/${id}`);
+      console.log(`Polling attempt ${pollingAttempts+1}: ${apiUrl}/query/${id}`);
+      
       // Check status endpoint
       const response = await fetch(`${apiUrl}/query/${id}`, {
         method: "GET",
@@ -269,34 +272,52 @@ const ChatInterface: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error(`Status API error: ${response.status}`);
+        console.error(`Status API error: ${response.status}`);
+        // Don't throw error, continue polling
+        return;
       }
 
       const data: QueryResponse = await response.json();
+      console.log("Status response:", data);
 
-      if (data.status === "success" && data.answer) {
-        addBotMessage(data.answer);
-        setIsLoading(false);
-        setCorrelationId(null);
+      // Handle different status cases
+      switch (data.status) {
+        case "COMPLETED":
+          if (data.response) {
+            // We have a final answer, stop polling and display it
+            addBotMessage(data.response);
+            setIsLoading(false);
+            setCorrelationId(null);
 
-        if (pollingInterval) {
-          clearInterval(pollingInterval);
-          setPollingInterval(null);
-        }
-      } else if (data.status === "error") {
-        addBotMessage(`Error processing your request: ${data.message}`);
-        setIsLoading(false);
-        setCorrelationId(null);
+            if (pollingInterval) {
+              clearInterval(pollingInterval);
+              setPollingInterval(null);
+            }
+          }
+          break;
+        case "ERROR":
+          // Error occurred, stop polling and show error
+          addBotMessage(`Error processing your request: ${data.error || "Unknown error"}`);
+          setIsLoading(false);
+          setCorrelationId(null);
 
-        if (pollingInterval) {
-          clearInterval(pollingInterval);
-          setPollingInterval(null);
-        }
+          if (pollingInterval) {
+            clearInterval(pollingInterval);
+            setPollingInterval(null);
+          }
+          break;
+        case "PROCESSING":
+        case "PENDING":
+          // Still processing, continue polling
+          console.log(`Query ${id} still processing, continuing to poll...`);
+          break;
+        default:
+          // Unknown status
+          console.log(`Received unknown status: ${data.status}`);
       }
-      // If status is still "processing", we'll continue polling
     } catch (err) {
       console.error("Error checking query status:", err);
-      // Don't set error here, just log it and continue polling
+      // Continue polling despite errors, but log them
     }
   };
 
